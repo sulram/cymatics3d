@@ -46,7 +46,8 @@ input[type=color]{width:100%;height:26px;padding:0;border:1px solid var(--line);
 #drop.on{display:flex}
 #tip b{font:500 11px var(--display);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:3px;color:var(--accent)}
 .row label{font-size:13px}
-.row output{font:12px var(--display);text-align:right;font-variant-numeric:tabular-nums}
+.row output{font:12px var(--display);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.row[data-x]{grid-template-columns:100px 1fr 88px}
 input[type=range]{width:100%;accent-color:var(--ink);margin:0;height:20px}
 select,button{font:inherit;color:inherit}
 select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line);border-radius:3px;padding:5px 6px}
@@ -57,7 +58,7 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
 .check input{accent-color:var(--ink);margin:0}
 .mirror{display:flex;align-items:center;gap:18px;font-size:13px}
 .mirror>.lab{width:92px}
-.export{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.export{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px}
 .export button{font:500 13px var(--display);letter-spacing:.03em;padding:10px 8px;border-radius:3px;border:1px solid var(--ink);cursor:pointer;background:var(--accent)}
 .export button.alt{background:transparent}
 .export button:disabled{opacity:.5;cursor:default}
@@ -136,6 +137,8 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
       <select id="shape"><option value="shell">Shell (|f| &lt; t)</option><option value="solid">Volume (f &lt; t)</option></select></div>
     <div class="row"><label for="thickness">Thickness</label><input type="range" id="thickness" min="-1" max="1.5" step="0.01" value="0.4"><output for="thickness"></output></div>
     <div class="row"><label for="res">Resolution</label><input type="range" id="res" min="32" max="256" step="16" value="128"><output for="res"></output></div>
+    <span class="lab"><label class="check"><input type="checkbox" id="vox"> Voxelize</label></span>
+    <div class="row" data-x><label for="voxN">Voxels</label><input type="range" id="voxN" min="8" max="256" step="1" value="48"><output for="voxN"></output></div>
     <div class="row"><label for="size">Edge (mm)</label><input type="range" id="size" min="50" max="600" step="10" value="300"><output for="size"></output></div>
   </div>
   </details>
@@ -193,8 +196,9 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
     <div class="export">
       <button type="button" id="xGlb">GLB</button>
       <button type="button" id="xStl" class="alt">STL</button>
+      <button type="button" id="xVox" class="alt">VOX</button>
     </div>
-    <p id="msg">GLB in metres, Y up. STL in millimetres, Z up. Each export comes with its settings .json.</p>
+    <p id="msg">GLB in metres, Y up. STL in millimetres, Z up. VOX is a MagicaVoxel file at the Voxels count. Each export comes with its settings .json.</p>
   </div>
   </details>
 </form>
@@ -286,17 +290,14 @@ function makeField(p) {
     0.5 + ((mz && z > 0.5 ? 1 - z : z) - 0.5) * iz + oz);
 }
 
-function buildMesh(p, fieldOverride) {
-  // the volume is a box of w x d x h (fractions of the longest edge); grid cells stay cubic
-  const N = p.res, dim = (v) => Math.max(4, Math.round(N * (v > 0 ? Math.min(v, 1) : 1)));
-  const Nx = dim(p.w), Ny = dim(p.d), Nz = dim(p.h), Sx = Nx + 1, Sy = Ny + 1, Sz = Nz + 1;
-  const S = Sx, S2 = Sx * Sy, hx = Nx / (2 * N), hy = Ny / (2 * N), hz = Nz / (2 * N);
-  const f = fieldOverride || makeField(p);
+// samples the solid (positive inside) on a grid: at cell corners (o = 0) or cell centres (o = 0.5)
+function sampleVal(p, f, N, Nx, Ny, Nz, o) {
+  const Cx = o ? Nx : Nx + 1, Cy = o ? Ny : Ny + 1, Cz = o ? Nz : Nz + 1, hx = Nx / (2 * N), hy = Ny / (2 * N), hz = Nz / (2 * N);
   const t = p.thickness, shell = p.shape === 'shell';
-  const val = new Float32Array(Sz * S2);
-  for (let k = 0, q = 0; k < Sz; k++) { const z = 0.5 + k / N - hz;
-    for (let j = 0; j < Sy; j++) { const y = 0.5 + j / N - hy;
-      for (let i = 0; i < Sx; i++, q++) { const w = f(0.5 + i / N - hx, y, z); val[q] = shell ? t - Math.abs(w) : t - w; } } }
+  const val = new Float32Array(Cx * Cy * Cz);
+  for (let k = 0, q = 0; k < Cz; k++) { const z = 0.5 + (k + o) / N - hz;
+    for (let j = 0; j < Cy; j++) { const y = 0.5 + (j + o) / N - hy;
+      for (let i = 0; i < Cx; i++, q++) { const w = f(0.5 + (i + o) / N - hx, y, z); val[q] = shell ? t - Math.abs(w) : t - w; } } }
   if (p.fall) {
     const kind = p.fallShape, R = 0.18, hollow = kind === 'vase' && p.vHollow;
     // falloff: the solid thins out and closes smoothly before it reaches an outer shape
@@ -308,9 +309,9 @@ function buildMesh(p, fieldOverride) {
     const ss = (u) => u * u * (3 - 2 * u);
     const prof = (u) => 0.5 * (u < tb ? rb + (rm - rb) * ss(u / tb) : rm + (rt - rm) * ss((u - tb) / (1 - tb)));
     const wall = Math.max(0.02, p.vWall || 0.1), zb = p.vFloor ? -0.5 + wall : -1e9, G = 8, K = 0.45;
-    for (let k = 0, q = 0; k < Sz; k++) { const zs = (k / N - hz) / (2 * hz), cz = Math.abs(zs), pr = kind === 'vase' ? prof(zs + 0.5) : 0;
-      for (let j = 0; j < Sy; j++) { const cy = Math.abs((j / N - hy) / (2 * hy));
-        for (let i = 0; i < Sx; i++, q++) { const cx = Math.abs((i / N - hx) / (2 * hx));
+    for (let k = 0, q = 0; k < Cz; k++) { const zs = ((k + o) / N - hz) / (2 * hz), cz = Math.abs(zs), pr = kind === 'vase' ? prof(zs + 0.5) : 0;
+      for (let j = 0; j < Cy; j++) { const cy = Math.abs(((j + o) / N - hy) / (2 * hy));
+        for (let i = 0; i < Cx; i++, q++) { const cx = Math.abs(((i + o) / N - hx) / (2 * hx));
           let d;                                   // signed distance to the outer shape, negative inside
           if (kind === 'sphere') d = Math.hypot(cx, cy, cz) - 0.5;
           else if (kind === 'cylinder') { const a = Math.hypot(cx, cy) - 0.5, b = cz - 0.5; d = Math.min(Math.max(a, b), 0) + Math.hypot(Math.max(a, 0), Math.max(b, 0)); }
@@ -335,6 +336,85 @@ function buildMesh(p, fieldOverride) {
           if (s > 0) val[q] -= amp * s * s;
         } } }
   }
+  return val;
+}
+
+// ---- voxels ----
+function voxelGrid(p, fieldOverride) {
+  const V = Math.max(4, Math.min(256, Math.round(p.voxN || 48))), dim = (v) => Math.max(2, Math.round(V * (v > 0 ? Math.min(v, 1) : 1)));
+  const Nx = dim(p.w), Ny = dim(p.d), Nz = dim(p.h);
+  const val = sampleVal(p, fieldOverride || makeField(p), V, Nx, Ny, Nz, 0.5);
+  const occ = new Uint8Array(val.length); let count = 0;
+  for (let q = 0; q < val.length; q++) if (val[q] > 0) { occ[q] = 1; count++; }
+  return { occ, dims: [Nx, Ny, Nz], V, count };
+}
+// greedy mesh: one quad per merged rectangle of exposed voxel faces
+function buildVoxelMesh(p, fieldOverride) {
+  const { occ, dims, V, count } = voxelGrid(p, fieldOverride);
+  const half = [dims[0] / (2 * V), dims[1] / (2 * V), dims[2] / (2 * V)], sx = dims[0], sxy = dims[0] * dims[1];
+  let pos = new Float32Array(1 << 14), nor = new Float32Array(1 << 14), np = 0, idx = new Uint32Array(1 << 14), ni = 0;
+  const x = [0, 0, 0], qd = [0, 0, 0];
+  for (let d = 0; d < 3; d++) {
+    const u = (d + 1) % 3, v = (d + 2) % 3, du = [0, 0, 0], dv = [0, 0, 0], mask = new Int8Array(dims[u] * dims[v]);
+    qd[0] = qd[1] = qd[2] = 0; qd[d] = 1;
+    for (x[d] = -1; x[d] < dims[d];) {
+      let n = 0;
+      for (x[v] = 0; x[v] < dims[v]; x[v]++) for (x[u] = 0; x[u] < dims[u]; x[u]++) {
+        const a = x[d] >= 0 ? occ[x[0] + x[1] * sx + x[2] * sxy] : 0;
+        const b = x[d] < dims[d] - 1 ? occ[x[0] + qd[0] + (x[1] + qd[1]) * sx + (x[2] + qd[2]) * sxy] : 0;
+        mask[n++] = a && !b ? 1 : !a && b ? -1 : 0;
+      }
+      x[d]++;
+      n = 0;
+      for (let j = 0; j < dims[v]; j++) for (let i = 0; i < dims[u];) {
+        const c = mask[n];
+        if (!c) { i++; n++; continue; }
+        let w = 1; while (i + w < dims[u] && mask[n + w] === c) w++;
+        let hgt = 1, ok = true;
+        while (j + hgt < dims[v] && ok) { for (let k = 0; k < w; k++) if (mask[n + k + hgt * dims[u]] !== c) { ok = false; break; } if (ok) hgt++; }
+        x[u] = i; x[v] = j; du[0] = du[1] = du[2] = 0; dv[0] = dv[1] = dv[2] = 0; du[u] = w; dv[v] = hgt;
+        if (np + 12 > pos.length) { let g = new Float32Array(pos.length * 2); g.set(pos); pos = g; g = new Float32Array(nor.length * 2); g.set(nor); nor = g; }
+        if (ni + 6 > idx.length) { const g = new Uint32Array(idx.length * 2); g.set(idx); idx = g; }
+        const b0 = np / 3, C = [[0, 0], [1, 0], [1, 1], [0, 1]];
+        for (let k = 0; k < 4; k++) for (let a = 0; a < 3; a++) {
+          pos[np + k * 3 + a] = (x[a] + C[k][0] * du[a] + C[k][1] * dv[a]) / V - half[a];
+          nor[np + k * 3 + a] = a === d ? c : 0;
+        }
+        np += 12;
+        if (c > 0) { idx[ni++] = b0; idx[ni++] = b0 + 1; idx[ni++] = b0 + 2; idx[ni++] = b0; idx[ni++] = b0 + 2; idx[ni++] = b0 + 3; }
+        else { idx[ni++] = b0; idx[ni++] = b0 + 2; idx[ni++] = b0 + 1; idx[ni++] = b0; idx[ni++] = b0 + 3; idx[ni++] = b0 + 2; }
+        for (let l = 0; l < hgt; l++) for (let k = 0; k < w; k++) mask[n + k + l * dims[u]] = 0;
+        i += w; n += w;
+      }
+    }
+  }
+  return { pos: pos.slice(0, np), nor: nor.slice(0, np), idx: idx.slice(0, ni), voxels: count };
+}
+// MagicaVoxel .vox (Z up), every solid voxel in palette colour 1
+function writeVOX(p, settings) {
+  const { occ, dims, count } = voxelGrid(p);
+  const out = new Uint8Array(8 + 12 + 24 + 12 + 4 + count * 4 + 12 + 1024), dv = new DataView(out.buffer);
+  const tag = (o, s) => { for (let i = 0; i < 4; i++) out[o + i] = s.charCodeAt(i); };
+  tag(0, 'VOX '); dv.setUint32(4, 150, true);
+  tag(8, 'MAIN'); dv.setUint32(12, 0, true); dv.setUint32(16, out.length - 20, true);
+  let o = 20;
+  tag(o, 'SIZE'); dv.setUint32(o + 4, 12, true); dv.setUint32(o + 8, 0, true);
+  dv.setUint32(o + 12, dims[0], true); dv.setUint32(o + 16, dims[1], true); dv.setUint32(o + 20, dims[2], true); o += 24;
+  tag(o, 'XYZI'); dv.setUint32(o + 4, 4 + count * 4, true); dv.setUint32(o + 8, 0, true); dv.setUint32(o + 12, count, true); o += 16;
+  for (let z = 0, q = 0; z < dims[2]; z++) for (let y = 0; y < dims[1]; y++) for (let xx = 0; xx < dims[0]; xx++, q++)
+    if (occ[q]) { out[o] = xx; out[o + 1] = y; out[o + 2] = z; out[o + 3] = 1; o += 4; }
+  tag(o, 'RGBA'); dv.setUint32(o + 4, 1024, true); dv.setUint32(o + 8, 0, true); o += 12;
+  const m = settings && /^#([0-9a-f]{6})$/i.exec(settings.fg || ''), c = m ? parseInt(m[1], 16) : 0xeedec4;
+  for (let i = 0; i < 256; i++) { const g = i === 0 ? c : 0x808080; out[o + i * 4] = g >> 16; out[o + i * 4 + 1] = g >> 8 & 255; out[o + i * 4 + 2] = g & 255; out[o + i * 4 + 3] = 255; }
+  return out;
+}
+
+function buildMesh(p, fieldOverride) {
+  // the volume is a box of w x d x h (fractions of the longest edge); grid cells stay cubic
+  const N = p.res, dim = (v) => Math.max(4, Math.round(N * (v > 0 ? Math.min(v, 1) : 1)));
+  const Nx = dim(p.w), Ny = dim(p.d), Nz = dim(p.h), Sx = Nx + 1, Sy = Ny + 1, Sz = Nz + 1;
+  const S = Sx, S2 = Sx * Sy, hx = Nx / (2 * N), hy = Ny / (2 * N), hz = Nz / (2 * N);
+  const val = sampleVal(p, fieldOverride || makeField(p), N, Nx, Ny, Nz, 0);
 
   // indexed marching cubes (solid where val > 0); edge vertices cached two layers at a time
   let eA = new Int32Array(3 * S2).fill(-1), eB = new Int32Array(3 * S2).fill(-1);
@@ -545,12 +625,14 @@ onmessage = (e) => {
   const d = e.data;
   if (d.kind === 'mesh') {
     const t0 = performance.now();
-    const m = buildMesh(d.p);
+    const m = d.p.vox ? buildVoxelMesh(d.p) : buildMesh(d.p);
     if (d.full) { last = { pos: m.pos.slice(), nor: m.nor.slice(), idx: m.idx.slice() }; lastKey = JSON.stringify(d.p); }
-    postMessage({ kind: 'mesh', id: d.id, full: d.full, ms: performance.now() - t0, ...m }, [m.pos.buffer, m.nor.buffer, m.idx.buffer]);
+    postMessage({ kind: 'mesh', id: d.id, full: d.full, ms: performance.now() - t0, pos: m.pos, nor: m.nor, idx: m.idx, voxels: m.voxels }, [m.pos.buffer, m.nor.buffer, m.idx.buffer]);
   } else if (d.kind === 'export') {
-    if (lastKey !== JSON.stringify(d.p)) { last = buildMesh(d.p); lastKey = JSON.stringify(d.p); }
-    let bytes = d.fmt === 'glb' ? writeGLB(last.pos, last.nor, last.idx, d.size / 1000, d.settings) : writeSTL(last.pos, last.idx, d.size);
+    let bytes;
+    if (d.fmt === 'vox') bytes = writeVOX(d.p, d.settings);
+    else if (lastKey !== JSON.stringify(d.p)) { last = d.p.vox ? buildVoxelMesh(d.p) : buildMesh(d.p); lastKey = JSON.stringify(d.p); }
+    if (d.fmt !== 'vox') bytes = d.fmt === 'glb' ? writeGLB(last.pos, last.nor, last.idx, d.size / 1000, d.settings) : writeSTL(last.pos, last.idx, d.size);
     if (d.zip) bytes = zipStore([[d.name, bytes], [d.jsonName, new TextEncoder().encode(d.json)]]);
     postMessage({ kind: 'export', bytes, name: d.name, zip: d.zip, fmt: d.fmt }, [bytes.buffer]);
   }
@@ -562,7 +644,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const $ = (id) => document.getElementById(id);
-const ids = ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
+const ids = ['voxN','w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
 const fmt = (v) => String(+(+v).toFixed(2));
 
 // ---------- scene ----------
@@ -629,9 +711,11 @@ let jobId = 0, running = false, queued = null, fullTimer = 0, exporting = null;
 function params(resOverride) {
   const p = { type: $('type').value, shape: $('shape').value };
   for (const k of ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
-  for (const k of ['mx','my','mz','fall','vHollow','vFloor']) p[k] = $(k).checked;
+  for (const k of ['mx','my','mz','fall','vHollow','vFloor','vox']) p[k] = $(k).checked;
+  p.voxN = +$('voxN').value;
   p.fallShape = $('fallShape').value; p.fallAmt = +$('fallAmt').value;
   p.res = resOverride || +$('res').value;
+  if (resOverride && p.vox) p.voxN = Math.min(p.voxN, 64);
   return p;
 }
 function send(job) {
@@ -660,7 +744,7 @@ worker.onmessage = (e) => {
       $('hV').textContent = (d.pos.length / 3).toLocaleString('en-US');
       $('hT').textContent = (d.idx.length / 3).toLocaleString('en-US');
       $('hMs').textContent = Math.round(d.ms);
-      $('hW').textContent = d.idx.length ? 'closed' : 'empty';
+      $('hW').textContent = !d.idx.length ? 'empty' : d.voxels !== undefined ? d.voxels.toLocaleString('en-US') + ' voxels' : 'closed';
     }
   } else if (d.kind === 'export' && exporting) { exporting(d); exporting = null; }
   if (queued) { const j = queued; queued = null; send(j); }
@@ -678,6 +762,10 @@ function syncLabels() {
   document.querySelectorAll('[data-v]').forEach((r) => { r.classList.toggle('hide', !vase); r.classList.toggle('dim', !fOn || (r.hasAttribute('data-h') && !hol)); });
   $('fallAmt').closest('.row').classList.toggle('dim', !fOn || hol);
   box.scale.set(+$('w').value, +$('h').value, +$('d').value);
+  const vx = $('vox').checked;
+  document.querySelectorAll('[data-x]').forEach((r) => r.classList.toggle('dim', !vx));
+  $('res').closest('.row').classList.toggle('dim', vx);
+  document.querySelector('output[for=voxN]').textContent = $('voxN').value + ' (' + String(+(+$('size').value / +$('voxN').value).toFixed(1)) + ' mm)';
   const a = ['l','m','n'].map((k) => fmt($(k).value)).join('·');
   const b = ['l2','m2','n2'].map((k) => fmt($(k).value)).join('·');
   const mir = ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
@@ -696,7 +784,7 @@ for (const k of ids) {
   const el = $(k), geom = k !== 'size';
   el.addEventListener('input', () => geom ? update(true) : syncLabels());
 }
-for (const k of ['type','shape','mx','my','mz','fall','fallShape','vHollow','vFloor']) $(k).addEventListener('change', () => update(false));
+for (const k of ['type','shape','mx','my','mz','fall','fallShape','vHollow','vFloor','vox']) $(k).addEventListener('change', () => update(false));
 $('layers').addEventListener('change', syncLabels);
 for (const k of ['fg','bg']) $(k).addEventListener('input', syncLabels);
 // remember which groups are open
@@ -770,6 +858,8 @@ const tips = {
   n2: ['n₂', 'Third wave number of the second mode. Only has an effect when Mix is above 0%.'],
   shape: ['Shape', 'Where the material goes. Shell keeps material close to the nodal surface, where the wave is near zero, like the sand lines on a Chladni plate. Volume keeps everything on one side of the wave.'],
   thickness: ['Thickness', 'In Shell, how far from the nodal surface the material reaches: higher means thicker walls and smaller holes. In Volume, the cut level of the wave: higher fills more of the cube. Negative values only work in Volume.'],
+  vox: ['Voxelize', 'Builds the solid out of cubes instead of a smooth surface. The preview, GLB and STL all become blocky. Flat areas are merged into large faces, so the triangle count is usually far lower.'],
+  voxN: ['Voxels', 'Number of voxels along the longest edge, from 8 to 256. The size of one voxel in millimetres is shown next to it. This is also the size of the MagicaVoxel export, which allows at most 256 per side.'],
   res: ['Resolution', 'Grid cells along each edge of the cube. Higher gives smoother surfaces but takes longer and makes heavier files. While you drag a slider the preview runs at 48.'],
   size: ['Edge (mm)', 'Real edge length of the cube in the exported file. It does not change the shape, only the scale and the number of plywood sheets drawn.'],
   fg: ['Object colour', 'Colour of the solid in the preview. It is also written to the GLB as its material colour. STL files carry no colour.'],
@@ -803,7 +893,7 @@ $('panel').addEventListener('scroll', hideTip);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
 // ---------- settings ----------
-const nums = ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','vHollow','vFloor','layers'];
+const nums = ['voxN','w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','vHollow','vFloor','vox','layers'];
 function getSettings() {
   const s = { app: 'cymatics3d', version: 1 };
   for (const k of sels) s[k] = $(k).value;
@@ -817,7 +907,7 @@ function applySettings(s) {
   for (const k of sels) if ([...$(k).options].some((o) => o.value === s[k])) $(k).value = s[k];
   for (const k of ['ox','oy','oz']) $(k).value = 0;
   for (const k of ['sc','sx','sy','sz','w','d','h']) $(k).value = 1;
-  $('fall').checked = false;
+  $('fall').checked = false; $('vox').checked = false;
   for (const k of nums) if (Number.isFinite(+s[k]) && s[k] !== null) $(k).value = +s[k];
   for (const k of bools) if (k in s) $(k).checked = !!s[k];
   for (const k of ['fg','bg']) if (/^#[0-9a-f]{6}$/i.test(s[k])) $(k).value = s[k].toLowerCase();
@@ -893,12 +983,12 @@ addEventListener('drop', (e) => {
 const say = (t) => { $('msg').textContent = t; };
 const mirTag = () => ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
 async function exportAs(fmtName) {
-  const btns = [$('xGlb'), $('xStl')]; btns.forEach((b) => b.disabled = true);
+  const btns = [$('xGlb'), $('xStl'), $('xVox')]; btns.forEach((b) => b.disabled = true);
   try {
     const cap = await getCap();
     const p = params(), base = baseName() + '_' + $('size').value + 'mm', name = base + '.' + fmtName;
     const settings = getSettings(), json = JSON.stringify(settings, null, 2);
-    say('Building ' + fmtName.toUpperCase() + ' at resolution ' + p.res + '…');
+    say('Building ' + fmtName.toUpperCase() + (fmtName === 'vox' || p.vox ? ' at ' + p.voxN + ' voxels' : ' at resolution ' + p.res) + '…');
     clearTimeout(fullTimer);
     const d = await new Promise((res) => { exporting = res; send({ kind: 'export', fmt: fmtName, p, size: +$('size').value, name, zip: !!cap, settings, json, jsonName: base + '.json' }); });
     const mb = (d.bytes.length / 1048576).toFixed(1) + ' MB';
@@ -906,7 +996,7 @@ async function exportAs(fmtName) {
       await cap.save({ filename: base + '_' + fmtName + '.zip', data: new Blob([d.bytes]) });
       say(`Saved ${name} and its settings .json in one .zip (${mb}).`);
     } else {
-      anchorSave(name, d.bytes, fmtName === 'glb' ? 'model/gltf-binary' : 'model/stl');
+      anchorSave(name, d.bytes, fmtName === 'glb' ? 'model/gltf-binary' : fmtName === 'stl' ? 'model/stl' : 'application/octet-stream');
       anchorSave(base + '.json', json, 'application/json');
       say(`${name} (${mb}) and its settings .json sent to download. If nothing downloaded, open this page outside the chat panel.`);
     }
@@ -915,6 +1005,7 @@ async function exportAs(fmtName) {
 }
 $('xGlb').addEventListener('click', () => exportAs('glb'));
 $('xStl').addEventListener('click', () => exportAs('stl'));
+$('xVox').addEventListener('click', () => exportAs('vox'));
 
 update(false);
 </script>

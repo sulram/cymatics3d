@@ -15,7 +15,8 @@ A 3D cymatics generator that runs in the browser. It builds the nodal surface of
 - Outer shapes: sphere, cylinder, cone and rounded cube, where the solid closes with rounded ends instead of flat cuts
 - Vase: a turned profile with base, belly and top radii, solid or hollow with a chosen wall thickness and an optional closed bottom
 - Resolution up to 256 cells per edge, meshed with marching cubes in a Web Worker
-- Export to GLB (metres, Y up) and binary STL (millimetres, Z up), always as a closed mesh
+- Voxel mode with a chosen voxel count, meshed with greedy merging to keep triangle counts low
+- Export to GLB (metres, Y up), binary STL (millimetres, Z up) and MagicaVoxel VOX
 - Settings saved and loaded as a small JSON file, also by drag and drop
 
 ## Running it
