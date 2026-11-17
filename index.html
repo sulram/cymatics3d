@@ -108,6 +108,16 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
   </div>
   </details>
 
+  <details class="grp" data-g="Pattern scale" open>
+    <summary>Pattern scale</summary>
+    <div class="body">
+    <div class="row"><label for="sc">Scale</label><input type="range" id="sc" min="0.25" max="4" step="0.01" value="1"><output for="sc"></output></div>
+    <div class="row"><label for="sx">Scale X</label><input type="range" id="sx" min="0.25" max="4" step="0.01" value="1"><output for="sx"></output></div>
+    <div class="row"><label for="sy">Scale Y</label><input type="range" id="sy" min="0.25" max="4" step="0.01" value="1"><output for="sy"></output></div>
+    <div class="row"><label for="sz">Scale Z</label><input type="range" id="sz" min="0.25" max="4" step="0.01" value="1"><output for="sz"></output></div>
+    </div>
+  </details>
+
   <details class="grp" data-g="Second mode">
     <summary>Second mode</summary>
     <div class="body">
@@ -248,9 +258,15 @@ function makeField(p) {
   const g = mix <= 0 ? (x, y, z) => f(x, y, z, l, m, n)
     : (x, y, z) => (1 - mix) * f(x, y, z, l, m, n) + mix * f(x, y, z, l2, m2, n2);
   const ox = p.ox || 0, oy = p.oy || 0, oz = p.oz || 0;
-  if (!p.mx && !p.my && !p.mz) return ox || oy || oz ? (x, y, z) => g(x + ox, y + oy, z + oz) : g;
-  const mx = p.mx, my = p.my, mz = p.mz;   // mirror: fold each axis about the cube's mid-plane, then slide
-  return (x, y, z) => g((mx && x > 0.5 ? 1 - x : x) + ox, (my && y > 0.5 ? 1 - y : y) + oy, (mz && z > 0.5 ? 1 - z : z) + oz);
+  // pattern scale: zoom about the cube's centre (larger = bigger pattern)
+  const sc = p.sc > 0 ? p.sc : 1, ix = 1 / (sc * (p.sx > 0 ? p.sx : 1)), iy = 1 / (sc * (p.sy > 0 ? p.sy : 1)), iz = 1 / (sc * (p.sz > 0 ? p.sz : 1));
+  const plain = ix === 1 && iy === 1 && iz === 1;
+  if (!p.mx && !p.my && !p.mz && plain) return ox || oy || oz ? (x, y, z) => g(x + ox, y + oy, z + oz) : g;
+  const mx = p.mx, my = p.my, mz = p.mz;   // mirror: fold each axis about the cube's mid-plane, then scale, then slide
+  return (x, y, z) => g(
+    0.5 + ((mx && x > 0.5 ? 1 - x : x) - 0.5) * ix + ox,
+    0.5 + ((my && y > 0.5 ? 1 - y : y) - 0.5) * iy + oy,
+    0.5 + ((mz && z > 0.5 ? 1 - z : z) - 0.5) * iz + oz);
 }
 
 function buildMesh(p, fieldOverride) {
@@ -509,7 +525,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const $ = (id) => document.getElementById(id);
-const ids = ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
+const ids = ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
 const fmt = (v) => String(+(+v).toFixed(2));
 
 // ---------- scene ----------
@@ -575,7 +591,7 @@ let jobId = 0, running = false, queued = null, fullTimer = 0, exporting = null;
 
 function params(resOverride) {
   const p = { type: $('type').value, shape: $('shape').value };
-  for (const k of ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
+  for (const k of ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
   for (const k of ['mx','my','mz','fall']) p[k] = $(k).checked;
   p.fallShape = $('fallShape').value; p.fallAmt = +$('fallAmt').value;
   p.res = resOverride || +$('res').value;
@@ -665,6 +681,7 @@ const presets = [
 ];
 function apply(v) {
   for (const k of ['ox','oy','oz']) $(k).value = 0;
+  for (const k of ['sc','sx','sy','sz']) $(k).value = 1;
   for (const k of ['mx','my','mz','fall']) $(k).checked = false;
   for (const k in v) { const el = $(k); if (el.type === 'checkbox') el.checked = !!v[k]; else el.value = v[k]; }
   update(false);
@@ -694,6 +711,10 @@ const tips = {
   fall: ['Falloff', 'Instead of being cut flat by the cube, the solid thins out and closes on its own before it reaches an outer shape. Gives rounded, finished ends with no flat cut faces.'],
   fallShape: ['Outer shape', 'The invisible shape the solid fades toward. It sits inside the cube and touches its faces. The solid never reaches it.'],
   fallAmt: ['Influence', 'How deep inside the outer shape the fade begins. Low values keep the solid full and close it abruptly near the edge. High values start thinning it from the centre, leaving a smaller, softer piece.'],
+  sc: ['Scale', 'Zooms the whole pattern about the centre of the cube. Above 1 the pattern gets bigger, so fewer and thicker features fit. Below 1 it gets smaller and denser. The cube itself keeps its size.'],
+  sx: ['Scale X', 'Stretches the pattern along X only, on top of Scale. Above 1 elongates the features in that direction, below 1 squeezes them.'],
+  sy: ['Scale Y', 'Stretches the pattern along Y only. Works like Scale X.'],
+  sz: ['Scale Z', 'Stretches the pattern along Z only, the vertical direction. Works like Scale X.'],
   mix: ['Mix', 'Blends a second wave into the first. 0% uses only l, m, n. 50% weighs both modes equally. Mixing gives less symmetric, more organic shapes.'],
   l2: ['l₂', 'First wave number of the second mode. Only has an effect when Mix is above 0%.'],
   m2: ['m₂', 'Second wave number of the second mode. Only has an effect when Mix is above 0%.'],
@@ -733,7 +754,7 @@ $('panel').addEventListener('scroll', hideTip);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
 // ---------- settings ----------
-const nums = ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','layers'];
+const nums = ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','layers'];
 function getSettings() {
   const s = { app: 'cymatics3d', version: 1 };
   for (const k of sels) s[k] = $(k).value;
@@ -746,6 +767,7 @@ function applySettings(s) {
   if (!s || typeof s !== 'object' || !['l','m','n'].every((k) => Number.isFinite(+s[k]))) throw new Error('no settings');
   for (const k of sels) if ([...$(k).options].some((o) => o.value === s[k])) $(k).value = s[k];
   for (const k of ['ox','oy','oz']) $(k).value = 0;
+  for (const k of ['sc','sx','sy','sz']) $(k).value = 1;
   $('fall').checked = false;
   for (const k of nums) if (Number.isFinite(+s[k]) && s[k] !== null) $(k).value = +s[k];
   for (const k of bools) if (k in s) $(k).checked = !!s[k];
