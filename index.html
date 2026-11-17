@@ -64,6 +64,7 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 #msg{font-size:12.5px;color:var(--muted);min-height:1.45em;margin:0}
 .dim{opacity:.4}
+.hide{display:none!important}
 @media (max-width:760px){
   body{flex-direction:column}
   #stage{flex:none;height:48%}
@@ -139,13 +140,29 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
   </div>
   </details>
 
-  <details class="grp" data-g="Falloff">
-    <summary>Falloff</summary>
+  <details class="grp" data-g="Volume">
+    <summary>Volume</summary>
     <div class="body">
-    <span class="lab"><label class="check"><input type="checkbox" id="fall"> Fade out toward an outer shape</label></span>
+    <div class="row"><label for="w">Width</label><input type="range" id="w" min="0.2" max="1" step="0.01" value="1"><output for="w"></output></div>
+    <div class="row"><label for="d">Depth</label><input type="range" id="d" min="0.2" max="1" step="0.01" value="1"><output for="d"></output></div>
+    <div class="row"><label for="h">Height</label><input type="range" id="h" min="0.2" max="1" step="0.01" value="1"><output for="h"></output></div>
+    </div>
+  </details>
+
+  <details class="grp" data-g="Falloff">
+    <summary>Outer shape</summary>
+    <div class="body">
+    <span class="lab"><label class="check"><input type="checkbox" id="fall"> Use an outer shape</label></span>
     <div class="row" data-f><label for="fallShape">Outer shape</label>
-      <select id="fallShape"><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="rbox">Rounded cube</option></select></div>
+      <select id="fallShape"><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="rbox">Rounded cube</option><option value="vase">Vase</option></select></div>
     <div class="row" data-f><label for="fallAmt">Influence</label><input type="range" id="fallAmt" min="0.05" max="1" step="0.01" value="0.4"><output for="fallAmt"></output></div>
+    <div class="row" data-v><label for="vBase">Base radius</label><input type="range" id="vBase" min="0.05" max="1" step="0.01" value="0.45"><output for="vBase"></output></div>
+    <div class="row" data-v><label for="vBelly">Belly radius</label><input type="range" id="vBelly" min="0.05" max="1" step="0.01" value="1"><output for="vBelly"></output></div>
+    <div class="row" data-v><label for="vBellyH">Belly height</label><input type="range" id="vBellyH" min="0.05" max="0.95" step="0.01" value="0.4"><output for="vBellyH"></output></div>
+    <div class="row" data-v><label for="vTop">Top radius</label><input type="range" id="vTop" min="0.05" max="1" step="0.01" value="0.55"><output for="vTop"></output></div>
+    <span class="lab" data-v><label class="check"><input type="checkbox" id="vHollow" checked> Hollow</label></span>
+    <div class="row" data-v data-h><label for="vWall">Wall</label><input type="range" id="vWall" min="0.02" max="0.3" step="0.005" value="0.1"><output for="vWall"></output></div>
+    <span class="lab" data-v data-h><label class="check"><input type="checkbox" id="vFloor" checked> Closed bottom</label></span>
   </div>
   </details>
 
@@ -270,21 +287,30 @@ function makeField(p) {
 }
 
 function buildMesh(p, fieldOverride) {
-  const N = p.res, S = N + 1, S2 = S * S;
+  // the volume is a box of w x d x h (fractions of the longest edge); grid cells stay cubic
+  const N = p.res, dim = (v) => Math.max(4, Math.round(N * (v > 0 ? Math.min(v, 1) : 1)));
+  const Nx = dim(p.w), Ny = dim(p.d), Nz = dim(p.h), Sx = Nx + 1, Sy = Ny + 1, Sz = Nz + 1;
+  const S = Sx, S2 = Sx * Sy, hx = Nx / (2 * N), hy = Ny / (2 * N), hz = Nz / (2 * N);
   const f = fieldOverride || makeField(p);
   const t = p.thickness, shell = p.shape === 'shell';
-  const val = new Float32Array(S * S2);
-  for (let k = 0, q = 0; k < S; k++) { const z = k / N;
-    for (let j = 0; j < S; j++) { const y = j / N;
-      for (let i = 0; i < S; i++, q++) { const w = f(i / N, y, z); val[q] = shell ? t - Math.abs(w) : t - w; } } }
+  const val = new Float32Array(Sz * S2);
+  for (let k = 0, q = 0; k < Sz; k++) { const z = 0.5 + k / N - hz;
+    for (let j = 0; j < Sy; j++) { const y = 0.5 + j / N - hy;
+      for (let i = 0; i < Sx; i++, q++) { const w = f(0.5 + i / N - hx, y, z); val[q] = shell ? t - Math.abs(w) : t - w; } } }
   if (p.fall) {
+    const kind = p.fallShape, R = 0.18, hollow = kind === 'vase' && p.vHollow;
     // falloff: the solid thins out and closes smoothly before it reaches an outer shape
     // (the shell is rewritten as t² - f², which has no ridge, so its ends close round instead of as a knife edge)
-    const band = Math.max(0.05, p.fallAmt) * 0.5, amp = (shell ? t * t : t + 3) + 0.05, kind = p.fallShape, R = 0.18;
-    if (shell) for (let q = 0; q < val.length; q++) { const w = t - val[q]; val[q] = t > 0 ? t * t - w * w : -1; }
-    for (let k = 0, q = 0; k < S; k++) { const zs = k / N - 0.5, cz = Math.abs(zs);
-      for (let j = 0; j < S; j++) { const cy = Math.abs(j / N - 0.5);
-        for (let i = 0; i < S; i++, q++) { const cx = Math.abs(i / N - 0.5);
+    const band = Math.max(0.05, p.fallAmt) * 0.5, amp = (shell ? t * t : t + 3) + 0.05;
+    if (shell && !hollow) for (let q = 0; q < val.length; q++) { const w = t - val[q]; val[q] = t > 0 ? t * t - w * w : -1; }
+    // vase: a surface of revolution through base, belly and top radii (fractions of the half width)
+    const rb = p.vBase, rm = p.vBelly, rt = p.vTop, tb = Math.min(0.95, Math.max(0.05, p.vBellyH));
+    const ss = (u) => u * u * (3 - 2 * u);
+    const prof = (u) => 0.5 * (u < tb ? rb + (rm - rb) * ss(u / tb) : rm + (rt - rm) * ss((u - tb) / (1 - tb)));
+    const wall = Math.max(0.02, p.vWall || 0.1), zb = p.vFloor ? -0.5 + wall : -1e9, G = 8, K = 0.45;
+    for (let k = 0, q = 0; k < Sz; k++) { const zs = (k / N - hz) / (2 * hz), cz = Math.abs(zs), pr = kind === 'vase' ? prof(zs + 0.5) : 0;
+      for (let j = 0; j < Sy; j++) { const cy = Math.abs((j / N - hy) / (2 * hy));
+        for (let i = 0; i < Sx; i++, q++) { const cx = Math.abs((i / N - hx) / (2 * hx));
           let d;                                   // signed distance to the outer shape, negative inside
           if (kind === 'sphere') d = Math.hypot(cx, cy, cz) - 0.5;
           else if (kind === 'cylinder') { const a = Math.hypot(cx, cy) - 0.5, b = cz - 0.5; d = Math.min(Math.max(a, b), 0) + Math.hypot(Math.max(a, 0), Math.max(b, 0)); }
@@ -292,6 +318,17 @@ function buildMesh(p, fieldOverride) {
             const r = Math.hypot(cx, cy), ax = r - Math.min(r, zs < 0 ? 0.5 : 0), ay = cz - 0.5;
             const tt = Math.min(Math.max((r * 0.5 + (0.5 - zs)) / 1.25, 0), 1), bx = r - 0.5 * tt, by = zs - 0.5 + tt;
             d = (bx < 0 && ay < 0 ? -1 : 1) * Math.sqrt(Math.min(ax * ax + ay * ay, bx * bx + by * by));
+          }
+          else if (kind === 'vase') {
+            const r = Math.hypot(cx, cy);
+            d = Math.max(r - pr, cz - 0.5);
+            if (hollow) {
+              // the pattern lives only inside the wall; the floor, if any, is solid
+              const cav = Math.max(r - (pr - wall), zb - zs), wl = -Math.max(d, -cav) * G, a = val[q];
+              let e = Math.max(K - Math.abs(a - wl), 0) / K, v = Math.min(a, wl) - e * e * K * 0.25;
+              if (p.vFloor) { const fl = -Math.max(r - pr, zs - zb, -0.5 - zs) * G; e = Math.max(K - Math.abs(v - fl), 0) / K; v = Math.max(v, fl) + e * e * K * 0.25; }
+              val[q] = v; continue;
+            }
           }
           else { const a = cx - 0.5 + R, b = cy - 0.5 + R, c = cz - 0.5 + R; d = Math.hypot(Math.max(a, 0), Math.max(b, 0), Math.max(c, 0)) + Math.min(Math.max(a, b, c), 0) - R; }
           const s = 1 + d / band;
@@ -329,8 +366,8 @@ function buildMesh(p, fieldOverride) {
     if (cni + 3 > cidx.length) { const g = new Uint32Array(cidx.length * 2); g.set(cidx); cidx = g; }
     cidx[cni++] = a; cidx[cni++] = b; cidx[cni++] = c;
   };
-  for (let k = 0; k < N; k++) {
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+  for (let k = 0; k < Nz; k++) {
+    for (let j = 0; j < Ny; j++) for (let i = 0; i < Nx; i++) {
       const q = i + j * S + k * S2;
       let ci = 0;
       for (let c = 0; c < 8; c++) if (val[q + off[c]] > 0) ci |= 1 << c;
@@ -344,11 +381,11 @@ function buildMesh(p, fieldOverride) {
         let id = tab[key];
         if (id < 0) {
           const va = val[a], vb = val[a + step[ax]], mu = va / (va - vb);
-          const ai = a % S, aj = ((a / S) | 0) % S, ak = (a / S2) | 0;
+          const ai = a % S, aj = ((a / S) | 0) % Sy, ak = (a / S2) | 0;
           if (np + 3 > pos.length) { const g = new Float32Array(pos.length * 2); g.set(pos); pos = g; }
-          pos[np] = (ai + (ax === 0 ? mu : 0)) / N - 0.5;
-          pos[np + 1] = (aj + (ax === 1 ? mu : 0)) / N - 0.5;
-          pos[np + 2] = (ak + (ax === 2 ? mu : 0)) / N - 0.5;
+          pos[np] = (ai + (ax === 0 ? mu : 0)) / N - hx;
+          pos[np + 1] = (aj + (ax === 1 ? mu : 0)) / N - hy;
+          pos[np + 2] = (ak + (ax === 2 ? mu : 0)) / N - hz;
           id = np / 3; np += 3; tab[key] = id;
         }
         ev[e] = id;
@@ -358,16 +395,16 @@ function buildMesh(p, fieldOverride) {
         idx[ni++] = ev[triTable[o]]; idx[ni++] = ev[triTable[o + 2]]; idx[ni++] = ev[triTable[o + 1]];
       }
       // close the solid where this cube touches a face of the bounding cube
-      if (i > 0 && i < N - 1 && j > 0 && j < N - 1 && k > 0 && k < N - 1) continue;
+      if (i > 0 && i < Nx - 1 && j > 0 && j < Ny - 1 && k > 0 && k < Nz - 1) continue;
       for (let fc = 0; fc < 6; fc++) {
-        if (fc === 0 ? i !== 0 : fc === 1 ? i !== N - 1 : fc === 2 ? j !== 0 : fc === 3 ? j !== N - 1 : fc === 4 ? k !== 0 : k !== N - 1) continue;
+        if (fc === 0 ? i !== 0 : fc === 1 ? i !== Nx - 1 : fc === 2 ? j !== 0 : fc === 3 ? j !== Ny - 1 : fc === 4 ? k !== 0 : k !== Nz - 1) continue;
         const C = FC[fc], E = FE[fc];
         let n = 0, ins = 0, mask = 0;
         for (let c = 0; c < 4; c++) {
           const s = q + off[C[c]], inside = val[s] > 0, nextIn = val[q + off[C[(c + 1) & 3]]] > 0;
           if (inside) {
             ins++; mask |= 1 << c;
-            poly[n++] = capVert(fc, capC[fc], s, (s % S) / N - 0.5, (((s / S) | 0) % S) / N - 0.5, ((s / S2) | 0) / N - 0.5);
+            poly[n++] = capVert(fc, capC[fc], s, (s % S) / N - hx, (((s / S) | 0) % Sy) / N - hy, ((s / S2) | 0) / N - hz);
           }
           if (inside !== nextIn) { const v = ev[E[c]] * 3; poly[n++] = capVert(fc, capX[fc], ev[E[c]], pos[v], pos[v + 1], pos[v + 2]); }
         }
@@ -525,7 +562,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const $ = (id) => document.getElementById(id);
-const ids = ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
+const ids = ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
 const fmt = (v) => String(+(+v).toFixed(2));
 
 // ---------- scene ----------
@@ -591,8 +628,8 @@ let jobId = 0, running = false, queued = null, fullTimer = 0, exporting = null;
 
 function params(resOverride) {
   const p = { type: $('type').value, shape: $('shape').value };
-  for (const k of ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
-  for (const k of ['mx','my','mz','fall']) p[k] = $(k).checked;
+  for (const k of ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
+  for (const k of ['mx','my','mz','fall','vHollow','vFloor']) p[k] = $(k).checked;
   p.fallShape = $('fallShape').value; p.fallAmt = +$('fallAmt').value;
   p.res = resOverride || +$('res').value;
   return p;
@@ -636,7 +673,11 @@ function syncLabels() {
   for (const k of ids) document.querySelector(`output[for=${k}]`).textContent = k === 'mix' ? Math.round($(k).value * 100) + '%' : fmt($(k).value);
   const off = +$('mix').value === 0;
   document.querySelectorAll('[data-b]').forEach((r) => r.classList.toggle('dim', off));
-  document.querySelectorAll('[data-f]').forEach((r) => r.classList.toggle('dim', !$('fall').checked));
+  const fOn = $('fall').checked, vase = $('fallShape').value === 'vase', hol = vase && $('vHollow').checked;
+  document.querySelectorAll('[data-f]').forEach((r) => r.classList.toggle('dim', !fOn));
+  document.querySelectorAll('[data-v]').forEach((r) => { r.classList.toggle('hide', !vase); r.classList.toggle('dim', !fOn || (r.hasAttribute('data-h') && !hol)); });
+  $('fallAmt').closest('.row').classList.toggle('dim', !fOn || hol);
+  box.scale.set(+$('w').value, +$('h').value, +$('d').value);
   const a = ['l','m','n'].map((k) => fmt($(k).value)).join('·');
   const b = ['l2','m2','n2'].map((k) => fmt($(k).value)).join('·');
   const mir = ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
@@ -655,7 +696,7 @@ for (const k of ids) {
   const el = $(k), geom = k !== 'size';
   el.addEventListener('input', () => geom ? update(true) : syncLabels());
 }
-for (const k of ['type','shape','mx','my','mz','fall','fallShape']) $(k).addEventListener('change', () => update(false));
+for (const k of ['type','shape','mx','my','mz','fall','fallShape','vHollow','vFloor']) $(k).addEventListener('change', () => update(false));
 $('layers').addEventListener('change', syncLabels);
 for (const k of ['fg','bg']) $(k).addEventListener('input', syncLabels);
 // remember which groups are open
@@ -677,10 +718,12 @@ const presets = [
   ['diamond', { type:'diamond', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.5, shape:'shell' }],
   ['neovius', { type:'neovius', l:1, m:1, n:1, mix:0, thickness:0.45, shape:'shell' }],
   ['sphere mode', { type:'sphere', l:3.5, m:4, n:2, mix:0, thickness:0.35, shape:'shell', fall:true, fallShape:'sphere', fallAmt:0.25 }],
+  ['vase', { type:'gyroid', l:3, m:3, n:3, mix:0, thickness:0.95, shape:'shell', w:0.6, d:0.6, h:1, fall:true, fallShape:'vase', vBase:0.45, vBelly:1, vBellyH:0.4, vTop:0.55, vHollow:true, vWall:0.1, vFloor:true }],
   ['bubbles', { type:'chladni', l:3, m:3, n:1, mix:0, thickness:-0.2, shape:'solid' }],
 ];
 function apply(v) {
   for (const k of ['ox','oy','oz']) $(k).value = 0;
+  for (const k of ['w','d','h']) $(k).value = 1;
   for (const k of ['sc','sx','sy','sz']) $(k).value = 1;
   for (const k of ['mx','my','mz','fall']) $(k).checked = false;
   for (const k in v) { const el = $(k); if (el.type === 'checkbox') el.checked = !!v[k]; else el.value = v[k]; }
@@ -708,13 +751,19 @@ const tips = {
   ox: ['Offset X', 'Slides the cube along X through the wave, as a fraction of the cube edge. The wave stays put and the cube cuts a different piece of it, so you can travel along the shape. With Mirror on, the mirror plane stays in the middle.'],
   oy: ['Offset Y', 'Slides the cube along Y through the wave. Works like Offset X.'],
   oz: ['Offset Z', 'Slides the cube along Z through the wave, like moving the cut up or down. Works like Offset X.'],
-  fall: ['Falloff', 'Instead of being cut flat by the cube, the solid thins out and closes on its own before it reaches an outer shape. Gives rounded, finished ends with no flat cut faces.'],
-  fallShape: ['Outer shape', 'The invisible shape the solid fades toward. It sits inside the cube and touches its faces. The solid never reaches it.'],
-  fallAmt: ['Influence', 'How deep inside the outer shape the fade begins. Low values keep the solid full and close it abruptly near the edge. High values start thinning it from the centre, leaving a smaller, softer piece.'],
-  sc: ['Scale', 'Zooms the whole pattern about the centre of the cube. Above 1 the pattern gets bigger, so fewer and thicker features fit. Below 1 it gets smaller and denser. The cube itself keeps its size.'],
-  sx: ['Scale X', 'Stretches the pattern along X only, on top of Scale. Above 1 elongates the features in that direction, below 1 squeezes them.'],
-  sy: ['Scale Y', 'Stretches the pattern along Y only. Works like Scale X.'],
-  sz: ['Scale Z', 'Stretches the pattern along Z only, the vertical direction. Works like Scale X.'],
+  w: ['Width', 'Width of the volume along X, as a fraction of the Edge length. Below 1 the volume becomes a box instead of a cube. The pattern is not stretched, the box just cuts a narrower piece of it.'],
+  d: ['Depth', 'Depth of the volume along Y, as a fraction of the Edge length. A depth different from the width makes round outer shapes oval.'],
+  h: ['Height', 'Height of the volume along Z, as a fraction of the Edge length.'],
+  fall: ['Outer shape', 'Shapes the solid with an invisible outer form that fills the volume. The solid thins out and closes on its own before it reaches that form, so there are no flat cut faces. A hollow vase works differently: the pattern is kept only inside its wall.'],
+  fallShape: ['Outer shape', 'The form the solid follows. It is stretched to the Width, Depth and Height of the volume. Vase is a turned profile with its own radii and can be hollow.'],
+  fallAmt: ['Influence', 'How deep inside the outer shape the fade begins. Low values keep the solid full and close it abruptly near the edge. High values start thinning it from the centre, leaving a smaller, softer piece. Not used by a hollow vase.'],
+  vBase: ['Base radius', 'Radius of the vase at the bottom, as a fraction of half the volume width.'],
+  vBelly: ['Belly radius', 'Radius of the vase at its belly. Larger than base and top gives a classic vase, smaller gives an hourglass.'],
+  vBellyH: ['Belly height', 'How high the belly sits, from 0 at the base to 1 at the top.'],
+  vTop: ['Top radius', 'Radius of the vase at the rim.'],
+  vHollow: ['Hollow', 'On: a real vase, open at the top, where the pattern forms the wall and the inside is empty. Off: a solid piece with the silhouette of a vase.'],
+  vWall: ['Wall', 'Thickness of the vase wall, as a fraction of the volume width. The pattern is cut to this wall, so its own Thickness still decides how open the wall is.'],
+  vFloor: ['Closed bottom', 'Adds a solid floor as thick as the wall, so the vase stands and has a bottom.'],
   mix: ['Mix', 'Blends a second wave into the first. 0% uses only l, m, n. 50% weighs both modes equally. Mixing gives less symmetric, more organic shapes.'],
   l2: ['l₂', 'First wave number of the second mode. Only has an effect when Mix is above 0%.'],
   m2: ['m₂', 'Second wave number of the second mode. Only has an effect when Mix is above 0%.'],
@@ -754,7 +803,7 @@ $('panel').addEventListener('scroll', hideTip);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
 
 // ---------- settings ----------
-const nums = ['l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','layers'];
+const nums = ['w','d','h','vBase','vBelly','vBellyH','vTop','vWall','l','m','n','ox','oy','oz','sc','sx','sy','sz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','vHollow','vFloor','layers'];
 function getSettings() {
   const s = { app: 'cymatics3d', version: 1 };
   for (const k of sels) s[k] = $(k).value;
@@ -767,7 +816,7 @@ function applySettings(s) {
   if (!s || typeof s !== 'object' || !['l','m','n'].every((k) => Number.isFinite(+s[k]))) throw new Error('no settings');
   for (const k of sels) if ([...$(k).options].some((o) => o.value === s[k])) $(k).value = s[k];
   for (const k of ['ox','oy','oz']) $(k).value = 0;
-  for (const k of ['sc','sx','sy','sz']) $(k).value = 1;
+  for (const k of ['sc','sx','sy','sz','w','d','h']) $(k).value = 1;
   $('fall').checked = false;
   for (const k of nums) if (Number.isFinite(+s[k]) && s[k] !== null) $(k).value = +s[k];
   for (const k of bools) if (k in s) $(k).checked = !!s[k];
