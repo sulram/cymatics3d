@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cymatics 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: workbench (canvas) left, machine panel right; stacks on phones */
+  --bg:#dfe2df; --panel:#f3f4f1; --ink:#1b1f1d; --muted:#667069; --line:#c5cbc5; --accent:#e8b400;
+  --display:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --body:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);display:flex}
+#stage{position:relative;flex:1;min-width:0;min-height:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:absolute;left:16px;bottom:14px;right:16px;font:12px/1.5 var(--display);color:var(--hud,var(--muted));font-variant-numeric:tabular-nums;pointer-events:none;display:flex;gap:6px 18px;flex-wrap:wrap}
+#hud b{color:var(--hud-strong,var(--ink));font-weight:500}
+#busy{position:absolute;left:16px;top:14px;font:12px var(--display);color:var(--ink);background:var(--accent);padding:3px 8px;border-radius:2px;visibility:hidden}
+#busy.on{visibility:visible}
+#panel{width:330px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:18px 18px 22px;display:flex;flex-direction:column;gap:12px}
+h1{font:500 15px var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.sub{color:var(--muted);font-size:12.5px;margin:4px 0 0}
+.grp{border-top:1px solid var(--line);min-width:0}
+.grp summary{font:500 11px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:11px 0 0;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.grp summary::-webkit-details-marker{display:none}
+.grp summary::after{content:"+";font-size:14px;line-height:1;color:var(--ink)}
+.grp[open] summary::after{content:"\2212"}
+.grp summary:hover{color:var(--ink)}
+.grp .body{display:flex;flex-direction:column;gap:9px;padding-top:11px}
+input[type=color]{width:100%;height:26px;padding:0;border:1px solid var(--line);border-radius:3px;background:#fff;cursor:pointer}
+.row output.hex{font-size:11px;grid-column:auto}
+.row.color{grid-template-columns:100px 1fr 62px}
+.row{display:grid;grid-template-columns:100px 1fr 40px;align-items:center;gap:10px}
+.lab{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.help{flex:none;width:16px;height:16px;padding:0;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);font:500 10px/1 var(--display);cursor:help}
+.help:hover,.help:focus-visible,.help[aria-expanded=true]{border-color:var(--ink);color:var(--ink);background:#fff}
+#tip{position:fixed;z-index:10;max-width:270px;background:var(--ink);color:#f3f4f1;font:12.5px/1.45 var(--body);padding:9px 11px;border-radius:4px;box-shadow:0 6px 18px rgba(27,31,29,.25);visibility:hidden;pointer-events:none}
+#tip.on{visibility:visible}
+#drop{position:fixed;inset:10px;z-index:20;display:none;align-items:center;justify-content:center;border:2px dashed var(--ink);border-radius:6px;background:rgba(232,180,0,.88);font:500 15px var(--display);letter-spacing:.04em;text-transform:uppercase;pointer-events:none}
+#drop.on{display:flex}
+#tip b{font:500 11px var(--display);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:3px;color:var(--accent)}
+.row label{font-size:13px}
+.row output{font:12px var(--display);text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--ink);margin:0;height:20px}
+select,button{font:inherit;color:inherit}
+select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line);border-radius:3px;padding:5px 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:12px var(--display);background:transparent;border:1px solid var(--line);border-radius:3px;padding:4px 8px;cursor:pointer}
+.chips button:hover{border-color:var(--ink)}
+.check{display:flex;align-items:center;gap:8px;font-size:13px}
+.check input{accent-color:var(--ink);margin:0}
+.mirror{display:flex;align-items:center;gap:18px;font-size:13px}
+.mirror>.lab{width:92px}
+.export{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.export button{font:500 13px var(--display);letter-spacing:.03em;padding:10px 8px;border-radius:3px;border:1px solid var(--ink);cursor:pointer;background:var(--accent)}
+.export button.alt{background:transparent}
+.export button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#msg{font-size:12.5px;color:var(--muted);min-height:1.45em;margin:0}
+.dim{opacity:.4}
+@media (max-width:760px){
+  body{flex-direction:column}
+  #stage{flex:none;height:48%}
+  #panel{width:auto;flex:1;border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" aria-label="3D view of the shape"></canvas>
+  <div id="busy">computing</div>
+  <div id="hud"><span>mode <b id="hMode">3·2·1</b></span><span>vertices <b id="hV">0</b></span><span>triangles <b id="hT">0</b></span><span>mesh <b id="hW">closed</b></span><span><b id="hMs">0</b> ms</span></div>
+</div>
+<form id="panel" autocomplete="off">
+  <div>
+    <h1>Cymatics 3D</h1>
+    <p class="sub">Nodal surface of a standing wave inside a cube. Drag to rotate, scroll to zoom.</p>
+  </div>
+  <div class="chips" id="presets" aria-label="Presets"></div>
+
+  <details class="grp" data-g="Wave" open>
+    <summary>Wave</summary>
+    <div class="body">
+    <div class="row"><label for="type">Field</label>
+      <select id="type"><option value="chladni">Chladni (cube)</option><option value="gyroid">Gyroid</option></select></div>
+    <div class="row"><label for="l">l</label><input type="range" id="l" min="0" max="8" step="0.1" value="3"><output for="l"></output></div>
+    <div class="row"><label for="m">m</label><input type="range" id="m" min="0" max="8" step="0.1" value="2"><output for="m"></output></div>
+    <div class="row"><label for="n">n</label><input type="range" id="n" min="0" max="8" step="0.1" value="1"><output for="n"></output></div>
+    <div class="mirror"><span class="lab"><span id="mirrorLab">Mirror</span></span>
+      <label class="check"><input type="checkbox" id="mx"> X</label>
+      <label class="check"><input type="checkbox" id="my"> Y</label>
+      <label class="check"><input type="checkbox" id="mz"> Z</label></div>
+    <div class="row"><label for="ox">Offset X</label><input type="range" id="ox" min="-1" max="1" step="0.01" value="0"><output for="ox"></output></div>
+    <div class="row"><label for="oy">Offset Y</label><input type="range" id="oy" min="-1" max="1" step="0.01" value="0"><output for="oy"></output></div>
+    <div class="row"><label for="oz">Offset Z</label><input type="range" id="oz" min="-1" max="1" step="0.01" value="0"><output for="oz"></output></div>
+  </div>
+  </details>
+
+  <details class="grp" data-g="Second mode">
+    <summary>Second mode</summary>
+    <div class="body">
+    <div class="row"><label for="mix">Mix</label><input type="range" id="mix" min="0" max="1" step="0.01" value="0"><output for="mix"></output></div>
+    <div class="row" data-b><label for="l2">l₂</label><input type="range" id="l2" min="0" max="8" step="0.1" value="1"><output for="l2"></output></div>
+    <div class="row" data-b><label for="m2">m₂</label><input type="range" id="m2" min="0" max="8" step="0.1" value="4"><output for="m2"></output></div>
+    <div class="row" data-b><label for="n2">n₂</label><input type="range" id="n2" min="0" max="8" step="0.1" value="2"><output for="n2"></output></div>
+  </div>
+  </details>
+
+  <details class="grp" data-g="Solid" open>
+    <summary>Solid</summary>
+    <div class="body">
+    <div class="row"><label for="shape">Shape</label>
+      <select id="shape"><option value="shell">Shell (|f| &lt; t)</option><option value="solid">Volume (f &lt; t)</option></select></div>
+    <div class="row"><label for="thickness">Thickness</label><input type="range" id="thickness" min="-1" max="1.5" step="0.01" value="0.4"><output for="thickness"></output></div>
+    <div class="row"><label for="res">Resolution</label><input type="range" id="res" min="32" max="256" step="16" value="128"><output for="res"></output></div>
+    <div class="row"><label for="size">Edge (mm)</label><input type="range" id="size" min="50" max="600" step="10" value="300"><output for="size"></output></div>
+  </div>
+  </details>
+
+  <details class="grp" data-g="Falloff">
+    <summary>Falloff</summary>
+    <div class="body">
+    <span class="lab"><label class="check"><input type="checkbox" id="fall"> Fade out toward an outer shape</label></span>
+    <div class="row" data-f><label for="fallShape">Outer shape</label>
+      <select id="fallShape"><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="rbox">Rounded cube</option></select></div>
+    <div class="row" data-f><label for="fallAmt">Influence</label><input type="range" id="fallAmt" min="0.05" max="1" step="0.01" value="0.4"><output for="fallAmt"></output></div>
+  </div>
+  </details>
+
+  <details class="grp" data-g="Appearance" open>
+    <summary>Appearance</summary>
+    <div class="body">
+    <div class="row color"><label for="fg">Object</label><input type="color" id="fg" value="#eedec4"><output for="fg" class="hex"></output></div>
+    <div class="row color"><label for="bg">Background</label><input type="color" id="bg" value="#dfe2df"><output for="bg" class="hex"></output></div>
+    <span class="lab"><label class="check"><input type="checkbox" id="layers" checked> Show 18 mm plywood sheets</label></span>
+    </div>
+  </details>
+
+  <details class="grp" data-g="Settings">
+    <summary>Settings</summary>
+    <div class="body">
+    <div class="export">
+      <button type="button" id="sSave" class="alt">Save .json</button>
+      <button type="button" id="sLoad" class="alt">Load .json</button>
+    </div>
+    <input type="file" id="sFile" accept=".json,.zip,.glb,application/json" hidden>
+    <p class="sub" id="sMsg">Or drop a settings .json anywhere on this page. A .zip or .glb exported here works too.</p>
+  </div>
+  </details>
+
+  <details class="grp" data-g="Export" open>
+    <summary>Export</summary>
+    <div class="body">
+    <div class="export">
+      <button type="button" id="xGlb">GLB</button>
+      <button type="button" id="xStl" class="alt">STL</button>
+    </div>
+    <p id="msg">GLB in metres, Y up. STL in millimetres, Z up. Each export comes with its settings .json.</p>
+  </div>
+  </details>
+</form>
+<div id="tip" role="tooltip"></div>
+<div id="drop">Drop to load these settings</div>
+
+<script type="text/plain" id="core">
+const edgeTable=new Int32Array([0x0,0x109,0x203,0x30a,0x406,0x50f,0x605,0x70c,0x80c,0x905,0xa0f,0xb06,0xc0a,0xd03,0xe09,0xf00,0x190,0x99,0x393,0x29a,0x596,0x49f,0x795,0x69c,0x99c,0x895,0xb9f,0xa96,0xd9a,0xc93,0xf99,0xe90,0x230,0x339,0x33,0x13a,0x636,0x73f,0x435,0x53c,0xa3c,0xb35,0x83f,0x936,0xe3a,0xf33,0xc39,0xd30,0x3a0,0x2a9,0x1a3,0xaa,0x7a6,0x6af,0x5a5,0x4ac,0xbac,0xaa5,0x9af,0x8a6,0xfaa,0xea3,0xda9,0xca0,0x460,0x569,0x663,0x76a,0x66,0x16f,0x265,0x36c,0xc6c,0xd65,0xe6f,0xf66,0x86a,0x963,0xa69,0xb60,0x5f0,0x4f9,0x7f3,0x6fa,0x1f6,0xff,0x3f5,0x2fc,0xdfc,0xcf5,0xfff,0xef6,0x9fa,0x8f3,0xbf9,0xaf0,0x650,0x759,0x453,0x55a,0x256,0x35f,0x55,0x15c,0xe5c,0xf55,0xc5f,0xd56,0xa5a,0xb53,0x859,0x950,0x7c0,0x6c9,0x5c3,0x4ca,0x3c6,0x2cf,0x1c5,0xcc,0xfcc,0xec5,0xdcf,0xcc6,0xbca,0xac3,0x9c9,0x8c0,0x8c0,0x9c9,0xac3,0xbca,0xcc6,0xdcf,0xec5,0xfcc,0xcc,0x1c5,0x2cf,0x3c6,0x4ca,0x5c3,0x6c9,0x7c0,0x950,0x859,0xb53,0xa5a,0xd56,0xc5f,0xf55,0xe5c,0x15c,0x55,0x35f,0x256,0x55a,0x453,0x759,0x650,0xaf0,0xbf9,0x8f3,0x9fa,0xef6,0xfff,0xcf5,0xdfc,0x2fc,0x3f5,0xff,0x1f6,0x6fa,0x7f3,0x4f9,0x5f0,0xb60,0xa69,0x963,0x86a,0xf66,0xe6f,0xd65,0xc6c,0x36c,0x265,0x16f,0x66,0x76a,0x663,0x569,0x460,0xca0,0xda9,0xea3,0xfaa,0x8a6,0x9af,0xaa5,0xbac,0x4ac,0x5a5,0x6af,0x7a6,0xaa,0x1a3,0x2a9,0x3a0,0xd30,0xc39,0xf33,0xe3a,0x936,0x83f,0xb35,0xa3c,0x53c,0x435,0x73f,0x636,0x13a,0x33,0x339,0x230,0xe90,0xf99,0xc93,0xd9a,0xa96,0xb9f,0x895,0x99c,0x69c,0x795,0x49f,0x596,0x29a,0x393,0x99,0x190,0xf00,0xe09,0xd03,0xc0a,0xb06,0xa0f,0x905,0x80c,0x70c,0x605,0x50f,0x406,0x30a,0x203,0x109,0x0]);
+const triTable=new Int32Array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,8,3,9,8,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,1,2,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,2,10,0,2,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,8,3,2,10,8,10,9,8,-1,-1,-1,-1,-1,-1,-1,3,11,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,11,2,8,11,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,9,0,2,3,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,11,2,1,9,11,9,8,11,-1,-1,-1,-1,-1,-1,-1,3,10,1,11,10,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,10,1,0,8,10,8,11,10,-1,-1,-1,-1,-1,-1,-1,3,9,0,3,11,9,11,10,9,-1,-1,-1,-1,-1,-1,-1,9,8,10,10,8,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,7,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,3,0,7,3,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,8,4,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,1,9,4,7,1,7,3,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,8,4,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,4,7,3,0,4,1,2,10,-1,-1,-1,-1,-1,-1,-1,9,2,10,9,0,2,8,4,7,-1,-1,-1,-1,-1,-1,-1,2,10,9,2,9,7,2,7,3,7,9,4,-1,-1,-1,-1,8,4,7,3,11,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,4,7,11,2,4,2,0,4,-1,-1,-1,-1,-1,-1,-1,9,0,1,8,4,7,2,3,11,-1,-1,-1,-1,-1,-1,-1,4,7,11,9,4,11,9,11,2,9,2,1,-1,-1,-1,-1,3,10,1,3,11,10,7,8,4,-1,-1,-1,-1,-1,-1,-1,1,11,10,1,4,11,1,0,4,7,11,4,-1,-1,-1,-1,4,7,8,9,0,11,9,11,10,11,0,3,-1,-1,-1,-1,4,7,11,4,11,9,9,11,10,-1,-1,-1,-1,-1,-1,-1,9,5,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,5,4,0,8,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,5,4,1,5,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,5,4,8,3,5,3,1,5,-1,-1,-1,-1,-1,-1,-1,1,2,10,9,5,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,8,1,2,10,4,9,5,-1,-1,-1,-1,-1,-1,-1,5,2,10,5,4,2,4,0,2,-1,-1,-1,-1,-1,-1,-1,2,10,5,3,2,5,3,5,4,3,4,8,-1,-1,-1,-1,9,5,4,2,3,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,11,2,0,8,11,4,9,5,-1,-1,-1,-1,-1,-1,-1,0,5,4,0,1,5,2,3,11,-1,-1,-1,-1,-1,-1,-1,2,1,5,2,5,8,2,8,11,4,8,5,-1,-1,-1,-1,10,3,11,10,1,3,9,5,4,-1,-1,-1,-1,-1,-1,-1,4,9,5,0,8,1,8,10,1,8,11,10,-1,-1,-1,-1,5,4,0,5,0,11,5,11,10,11,0,3,-1,-1,-1,-1,5,4,8,5,8,10,10,8,11,-1,-1,-1,-1,-1,-1,-1,9,7,8,5,7,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,3,0,9,5,3,5,7,3,-1,-1,-1,-1,-1,-1,-1,0,7,8,0,1,7,1,5,7,-1,-1,-1,-1,-1,-1,-1,1,5,3,3,5,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,7,8,9,5,7,10,1,2,-1,-1,-1,-1,-1,-1,-1,10,1,2,9,5,0,5,3,0,5,7,3,-1,-1,-1,-1,8,0,2,8,2,5,8,5,7,10,5,2,-1,-1,-1,-1,2,10,5,2,5,3,3,5,7,-1,-1,-1,-1,-1,-1,-1,7,9,5,7,8,9,3,11,2,-1,-1,-1,-1,-1,-1,-1,9,5,7,9,7,2,9,2,0,2,7,11,-1,-1,-1,-1,2,3,11,0,1,8,1,7,8,1,5,7,-1,-1,-1,-1,11,2,1,11,1,7,7,1,5,-1,-1,-1,-1,-1,-1,-1,9,5,8,8,5,7,10,1,3,10,3,11,-1,-1,-1,-1,5,7,0,5,0,9,7,11,0,1,0,10,11,10,0,-1,11,10,0,11,0,3,10,5,0,8,0,7,5,7,0,-1,11,10,5,7,11,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,10,6,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,5,10,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,0,1,5,10,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,8,3,1,9,8,5,10,6,-1,-1,-1,-1,-1,-1,-1,1,6,5,2,6,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,6,5,1,2,6,3,0,8,-1,-1,-1,-1,-1,-1,-1,9,6,5,9,0,6,0,2,6,-1,-1,-1,-1,-1,-1,-1,5,9,8,5,8,2,5,2,6,3,2,8,-1,-1,-1,-1,2,3,11,10,6,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,0,8,11,2,0,10,6,5,-1,-1,-1,-1,-1,-1,-1,0,1,9,2,3,11,5,10,6,-1,-1,-1,-1,-1,-1,-1,5,10,6,1,9,2,9,11,2,9,8,11,-1,-1,-1,-1,6,3,11,6,5,3,5,1,3,-1,-1,-1,-1,-1,-1,-1,0,8,11,0,11,5,0,5,1,5,11,6,-1,-1,-1,-1,3,11,6,0,3,6,0,6,5,0,5,9,-1,-1,-1,-1,6,5,9,6,9,11,11,9,8,-1,-1,-1,-1,-1,-1,-1,5,10,6,4,7,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,3,0,4,7,3,6,5,10,-1,-1,-1,-1,-1,-1,-1,1,9,0,5,10,6,8,4,7,-1,-1,-1,-1,-1,-1,-1,10,6,5,1,9,7,1,7,3,7,9,4,-1,-1,-1,-1,6,1,2,6,5,1,4,7,8,-1,-1,-1,-1,-1,-1,-1,1,2,5,5,2,6,3,0,4,3,4,7,-1,-1,-1,-1,8,4,7,9,0,5,0,6,5,0,2,6,-1,-1,-1,-1,7,3,9,7,9,4,3,2,9,5,9,6,2,6,9,-1,3,11,2,7,8,4,10,6,5,-1,-1,-1,-1,-1,-1,-1,5,10,6,4,7,2,4,2,0,2,7,11,-1,-1,-1,-1,0,1,9,4,7,8,2,3,11,5,10,6,-1,-1,-1,-1,9,2,1,9,11,2,9,4,11,7,11,4,5,10,6,-1,8,4,7,3,11,5,3,5,1,5,11,6,-1,-1,-1,-1,5,1,11,5,11,6,1,0,11,7,11,4,0,4,11,-1,0,5,9,0,6,5,0,3,6,11,6,3,8,4,7,-1,6,5,9,6,9,11,4,7,9,7,11,9,-1,-1,-1,-1,10,4,9,6,4,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,10,6,4,9,10,0,8,3,-1,-1,-1,-1,-1,-1,-1,10,0,1,10,6,0,6,4,0,-1,-1,-1,-1,-1,-1,-1,8,3,1,8,1,6,8,6,4,6,1,10,-1,-1,-1,-1,1,4,9,1,2,4,2,6,4,-1,-1,-1,-1,-1,-1,-1,3,0,8,1,2,9,2,4,9,2,6,4,-1,-1,-1,-1,0,2,4,4,2,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,3,2,8,2,4,4,2,6,-1,-1,-1,-1,-1,-1,-1,10,4,9,10,6,4,11,2,3,-1,-1,-1,-1,-1,-1,-1,0,8,2,2,8,11,4,9,10,4,10,6,-1,-1,-1,-1,3,11,2,0,1,6,0,6,4,6,1,10,-1,-1,-1,-1,6,4,1,6,1,10,4,8,1,2,1,11,8,11,1,-1,9,6,4,9,3,6,9,1,3,11,6,3,-1,-1,-1,-1,8,11,1,8,1,0,11,6,1,9,1,4,6,4,1,-1,3,11,6,3,6,0,0,6,4,-1,-1,-1,-1,-1,-1,-1,6,4,8,11,6,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,10,6,7,8,10,8,9,10,-1,-1,-1,-1,-1,-1,-1,0,7,3,0,10,7,0,9,10,6,7,10,-1,-1,-1,-1,10,6,7,1,10,7,1,7,8,1,8,0,-1,-1,-1,-1,10,6,7,10,7,1,1,7,3,-1,-1,-1,-1,-1,-1,-1,1,2,6,1,6,8,1,8,9,8,6,7,-1,-1,-1,-1,2,6,9,2,9,1,6,7,9,0,9,3,7,3,9,-1,7,8,0,7,0,6,6,0,2,-1,-1,-1,-1,-1,-1,-1,7,3,2,6,7,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,11,10,6,8,10,8,9,8,6,7,-1,-1,-1,-1,2,0,7,2,7,11,0,9,7,6,7,10,9,10,7,-1,1,8,0,1,7,8,1,10,7,6,7,10,2,3,11,-1,11,2,1,11,1,7,10,6,1,6,7,1,-1,-1,-1,-1,8,9,6,8,6,7,9,1,6,11,6,3,1,3,6,-1,0,9,1,11,6,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,8,0,7,0,6,3,11,0,11,6,0,-1,-1,-1,-1,7,11,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,6,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,8,11,7,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,11,7,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,1,9,8,3,1,11,7,6,-1,-1,-1,-1,-1,-1,-1,10,1,2,6,11,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,10,3,0,8,6,11,7,-1,-1,-1,-1,-1,-1,-1,2,9,0,2,10,9,6,11,7,-1,-1,-1,-1,-1,-1,-1,6,11,7,2,10,3,10,8,3,10,9,8,-1,-1,-1,-1,7,2,3,6,2,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,0,8,7,6,0,6,2,0,-1,-1,-1,-1,-1,-1,-1,2,7,6,2,3,7,0,1,9,-1,-1,-1,-1,-1,-1,-1,1,6,2,1,8,6,1,9,8,8,7,6,-1,-1,-1,-1,10,7,6,10,1,7,1,3,7,-1,-1,-1,-1,-1,-1,-1,10,7,6,1,7,10,1,8,7,1,0,8,-1,-1,-1,-1,0,3,7,0,7,10,0,10,9,6,10,7,-1,-1,-1,-1,7,6,10,7,10,8,8,10,9,-1,-1,-1,-1,-1,-1,-1,6,8,4,11,8,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,6,11,3,0,6,0,4,6,-1,-1,-1,-1,-1,-1,-1,8,6,11,8,4,6,9,0,1,-1,-1,-1,-1,-1,-1,-1,9,4,6,9,6,3,9,3,1,11,3,6,-1,-1,-1,-1,6,8,4,6,11,8,2,10,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,3,0,11,0,6,11,0,4,6,-1,-1,-1,-1,4,11,8,4,6,11,0,2,9,2,10,9,-1,-1,-1,-1,10,9,3,10,3,2,9,4,3,11,3,6,4,6,3,-1,8,2,3,8,4,2,4,6,2,-1,-1,-1,-1,-1,-1,-1,0,4,2,4,6,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,9,0,2,3,4,2,4,6,4,3,8,-1,-1,-1,-1,1,9,4,1,4,2,2,4,6,-1,-1,-1,-1,-1,-1,-1,8,1,3,8,6,1,8,4,6,6,10,1,-1,-1,-1,-1,10,1,0,10,0,6,6,0,4,-1,-1,-1,-1,-1,-1,-1,4,6,3,4,3,8,6,10,3,0,3,9,10,9,3,-1,10,9,4,6,10,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,9,5,7,6,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,4,9,5,11,7,6,-1,-1,-1,-1,-1,-1,-1,5,0,1,5,4,0,7,6,11,-1,-1,-1,-1,-1,-1,-1,11,7,6,8,3,4,3,5,4,3,1,5,-1,-1,-1,-1,9,5,4,10,1,2,7,6,11,-1,-1,-1,-1,-1,-1,-1,6,11,7,1,2,10,0,8,3,4,9,5,-1,-1,-1,-1,7,6,11,5,4,10,4,2,10,4,0,2,-1,-1,-1,-1,3,4,8,3,5,4,3,2,5,10,5,2,11,7,6,-1,7,2,3,7,6,2,5,4,9,-1,-1,-1,-1,-1,-1,-1,9,5,4,0,8,6,0,6,2,6,8,7,-1,-1,-1,-1,3,6,2,3,7,6,1,5,0,5,4,0,-1,-1,-1,-1,6,2,8,6,8,7,2,1,8,4,8,5,1,5,8,-1,9,5,4,10,1,6,1,7,6,1,3,7,-1,-1,-1,-1,1,6,10,1,7,6,1,0,7,8,7,0,9,5,4,-1,4,0,10,4,10,5,0,3,10,6,10,7,3,7,10,-1,7,6,10,7,10,8,5,4,10,4,8,10,-1,-1,-1,-1,6,9,5,6,11,9,11,8,9,-1,-1,-1,-1,-1,-1,-1,3,6,11,0,6,3,0,5,6,0,9,5,-1,-1,-1,-1,0,11,8,0,5,11,0,1,5,5,6,11,-1,-1,-1,-1,6,11,3,6,3,5,5,3,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,9,5,11,9,11,8,11,5,6,-1,-1,-1,-1,0,11,3,0,6,11,0,9,6,5,6,9,1,2,10,-1,11,8,5,11,5,6,8,0,5,10,5,2,0,2,5,-1,6,11,3,6,3,5,2,10,3,10,5,3,-1,-1,-1,-1,5,8,9,5,2,8,5,6,2,3,8,2,-1,-1,-1,-1,9,5,6,9,6,0,0,6,2,-1,-1,-1,-1,-1,-1,-1,1,5,8,1,8,0,5,6,8,3,8,2,6,2,8,-1,1,5,6,2,1,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,3,6,1,6,10,3,8,6,5,6,9,8,9,6,-1,10,1,0,10,0,6,9,5,0,5,6,0,-1,-1,-1,-1,0,3,8,5,6,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,10,5,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,5,10,7,5,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,5,10,11,7,5,8,3,0,-1,-1,-1,-1,-1,-1,-1,5,11,7,5,10,11,1,9,0,-1,-1,-1,-1,-1,-1,-1,10,7,5,10,11,7,9,8,1,8,3,1,-1,-1,-1,-1,11,1,2,11,7,1,7,5,1,-1,-1,-1,-1,-1,-1,-1,0,8,3,1,2,7,1,7,5,7,2,11,-1,-1,-1,-1,9,7,5,9,2,7,9,0,2,2,11,7,-1,-1,-1,-1,7,5,2,7,2,11,5,9,2,3,2,8,9,8,2,-1,2,5,10,2,3,5,3,7,5,-1,-1,-1,-1,-1,-1,-1,8,2,0,8,5,2,8,7,5,10,2,5,-1,-1,-1,-1,9,0,1,5,10,3,5,3,7,3,10,2,-1,-1,-1,-1,9,8,2,9,2,1,8,7,2,10,2,5,7,5,2,-1,1,3,5,3,7,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,7,0,7,1,1,7,5,-1,-1,-1,-1,-1,-1,-1,9,0,3,9,3,5,5,3,7,-1,-1,-1,-1,-1,-1,-1,9,8,7,5,9,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,5,8,4,5,10,8,10,11,8,-1,-1,-1,-1,-1,-1,-1,5,0,4,5,11,0,5,10,11,11,3,0,-1,-1,-1,-1,0,1,9,8,4,10,8,10,11,10,4,5,-1,-1,-1,-1,10,11,4,10,4,5,11,3,4,9,4,1,3,1,4,-1,2,5,1,2,8,5,2,11,8,4,5,8,-1,-1,-1,-1,0,4,11,0,11,3,4,5,11,2,11,1,5,1,11,-1,0,2,5,0,5,9,2,11,5,4,5,8,11,8,5,-1,9,4,5,2,11,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,5,10,3,5,2,3,4,5,3,8,4,-1,-1,-1,-1,5,10,2,5,2,4,4,2,0,-1,-1,-1,-1,-1,-1,-1,3,10,2,3,5,10,3,8,5,4,5,8,0,1,9,-1,5,10,2,5,2,4,1,9,2,9,4,2,-1,-1,-1,-1,8,4,5,8,5,3,3,5,1,-1,-1,-1,-1,-1,-1,-1,0,4,5,1,0,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,4,5,8,5,3,9,0,5,0,3,5,-1,-1,-1,-1,9,4,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,11,7,4,9,11,9,10,11,-1,-1,-1,-1,-1,-1,-1,0,8,3,4,9,7,9,11,7,9,10,11,-1,-1,-1,-1,1,10,11,1,11,4,1,4,0,7,4,11,-1,-1,-1,-1,3,1,4,3,4,8,1,10,4,7,4,11,10,11,4,-1,4,11,7,9,11,4,9,2,11,9,1,2,-1,-1,-1,-1,9,7,4,9,11,7,9,1,11,2,11,1,0,8,3,-1,11,7,4,11,4,2,2,4,0,-1,-1,-1,-1,-1,-1,-1,11,7,4,11,4,2,8,3,4,3,2,4,-1,-1,-1,-1,2,9,10,2,7,9,2,3,7,7,4,9,-1,-1,-1,-1,9,10,7,9,7,4,10,2,7,8,7,0,2,0,7,-1,3,7,10,3,10,2,7,4,10,1,10,0,4,0,10,-1,1,10,2,8,7,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,9,1,4,1,7,7,1,3,-1,-1,-1,-1,-1,-1,-1,4,9,1,4,1,7,0,8,1,8,7,1,-1,-1,-1,-1,4,0,3,7,4,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,8,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,10,8,10,11,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,9,3,9,11,11,9,10,-1,-1,-1,-1,-1,-1,-1,0,1,10,0,10,8,8,10,11,-1,-1,-1,-1,-1,-1,-1,3,1,10,11,3,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,11,1,11,9,9,11,8,-1,-1,-1,-1,-1,-1,-1,3,0,9,3,9,11,1,2,9,2,11,9,-1,-1,-1,-1,0,2,11,8,0,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,2,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,8,2,8,10,10,8,9,-1,-1,-1,-1,-1,-1,-1,9,10,2,0,9,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,8,2,8,10,0,1,8,1,10,8,-1,-1,-1,-1,1,10,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,3,8,9,1,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,9,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,3,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]);
+// ---- field + marching cubes + exporters ----
+const PI = Math.PI;
+function makeField(p) {
+  const { type, l, m, n, l2, m2, n2, mix } = p;
+  const ch = (x, y, z, a, b, c) =>
+    Math.cos(a*PI*x)*Math.cos(b*PI*y)*Math.cos(c*PI*z) +
+    Math.cos(b*PI*x)*Math.cos(c*PI*y)*Math.cos(a*PI*z) +
+    Math.cos(c*PI*x)*Math.cos(a*PI*y)*Math.cos(b*PI*z);
+  const gy = (x, y, z, a, b, c) => {
+    const X = a*2*PI*x, Y = b*2*PI*y, Z = c*2*PI*z;
+    return (Math.sin(X)*Math.cos(Y) + Math.sin(Y)*Math.cos(Z) + Math.sin(Z)*Math.cos(X)) * 2;
+  };
+  const f = type === 'gyroid' ? gy : ch;
+  const g = mix <= 0 ? (x, y, z) => f(x, y, z, l, m, n)
+    : (x, y, z) => (1 - mix) * f(x, y, z, l, m, n) + mix * f(x, y, z, l2, m2, n2);
+  const ox = p.ox || 0, oy = p.oy || 0, oz = p.oz || 0;
+  if (!p.mx && !p.my && !p.mz) return ox || oy || oz ? (x, y, z) => g(x + ox, y + oy, z + oz) : g;
+  const mx = p.mx, my = p.my, mz = p.mz;   // mirror: fold each axis about the cube's mid-plane, then slide
+  return (x, y, z) => g((mx && x > 0.5 ? 1 - x : x) + ox, (my && y > 0.5 ? 1 - y : y) + oy, (mz && z > 0.5 ? 1 - z : z) + oz);
+}
+
+function buildMesh(p, fieldOverride) {
+  const N = p.res, S = N + 1, S2 = S * S;
+  const f = fieldOverride || makeField(p);
+  const t = p.thickness, shell = p.shape === 'shell';
+  const val = new Float32Array(S * S2);
+  for (let k = 0, q = 0; k < S; k++) { const z = k / N;
+    for (let j = 0; j < S; j++) { const y = j / N;
+      for (let i = 0; i < S; i++, q++) { const w = f(i / N, y, z); val[q] = shell ? t - Math.abs(w) : t - w; } } }
+  if (p.fall) {
+    // falloff: the solid thins out and closes smoothly before it reaches an outer shape
+    // (the shell is rewritten as t² - f², which has no ridge, so its ends close round instead of as a knife edge)
+    const band = Math.max(0.05, p.fallAmt) * 0.5, amp = (shell ? t * t : t + 3) + 0.05, kind = p.fallShape, R = 0.18;
+    if (shell) for (let q = 0; q < val.length; q++) { const w = t - val[q]; val[q] = t > 0 ? t * t - w * w : -1; }
+    for (let k = 0, q = 0; k < S; k++) { const cz = Math.abs(k / N - 0.5);
+      for (let j = 0; j < S; j++) { const cy = Math.abs(j / N - 0.5);
+        for (let i = 0; i < S; i++, q++) { const cx = Math.abs(i / N - 0.5);
+          let d;                                   // signed distance to the outer shape, negative inside
+          if (kind === 'sphere') d = Math.hypot(cx, cy, cz) - 0.5;
+          else if (kind === 'cylinder') { const a = Math.hypot(cx, cy) - 0.5, b = cz - 0.5; d = Math.min(Math.max(a, b), 0) + Math.hypot(Math.max(a, 0), Math.max(b, 0)); }
+          else { const a = cx - 0.5 + R, b = cy - 0.5 + R, c = cz - 0.5 + R; d = Math.hypot(Math.max(a, 0), Math.max(b, 0), Math.max(c, 0)) + Math.min(Math.max(a, b, c), 0) - R; }
+          const s = 1 + d / band;
+          if (s > 0) val[q] -= amp * s * s;
+        } } }
+  }
+
+  // indexed marching cubes (solid where val > 0); edge vertices cached two layers at a time
+  let eA = new Int32Array(3 * S2).fill(-1), eB = new Int32Array(3 * S2).fill(-1);
+  let pos = new Float32Array(1 << 16), np = 0;
+  let idx = new Uint32Array(1 << 16), ni = 0;
+  // caps: separate vertices with exact face normals, so the cut edge stays sharp
+  let cpos = new Float32Array(1 << 14), cnor = new Float32Array(1 << 14), cnp = 0;
+  let cidx = new Uint32Array(1 << 14), cni = 0;
+  const capX = [], capC = []; for (let i = 0; i < 6; i++) { capX.push(new Map()); capC.push(new Map()); }
+  const off = [0, 1, 1 + S, S, S2, 1 + S2, 1 + S + S2, S + S2];
+  const eBase = [0, 1, 3, 0, 4, 5, 7, 4, 0, 1, 2, 3], eAxis = [0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2];  // edge -> [base corner, axis]
+  const step = [1, S, S2];
+  // cube faces: corners in CCW order seen from outside, the edge after each corner, outward normal
+  const FC = [[0,4,7,3],[1,2,6,5],[0,1,5,4],[3,7,6,2],[0,3,2,1],[4,5,6,7]];
+  const FE = [[8,7,11,3],[1,10,5,9],[0,9,4,8],[11,6,10,2],[3,2,1,0],[4,5,6,7]];
+  const FN = [[-1,0,0],[1,0,0],[0,-1,0],[0,1,0],[0,0,-1],[0,0,1]];
+  const ev = new Int32Array(12), poly = new Int32Array(8);
+  const capVert = (face, map, key, x, y, z) => {
+    let id = map.get(key);
+    if (id === undefined) {
+      if (cnp + 3 > cpos.length) { let g = new Float32Array(cpos.length * 2); g.set(cpos); cpos = g; g = new Float32Array(cnor.length * 2); g.set(cnor); cnor = g; }
+      cpos[cnp] = x; cpos[cnp + 1] = y; cpos[cnp + 2] = z;
+      cnor[cnp] = FN[face][0]; cnor[cnp + 1] = FN[face][1]; cnor[cnp + 2] = FN[face][2];
+      id = cnp / 3; cnp += 3; map.set(key, id);
+    }
+    return id;
+  };
+  const capTri = (a, b, c) => {
+    if (cni + 3 > cidx.length) { const g = new Uint32Array(cidx.length * 2); g.set(cidx); cidx = g; }
+    cidx[cni++] = a; cidx[cni++] = b; cidx[cni++] = c;
+  };
+  for (let k = 0; k < N; k++) {
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const q = i + j * S + k * S2;
+      let ci = 0;
+      for (let c = 0; c < 8; c++) if (val[q + off[c]] > 0) ci |= 1 << c;
+      if (ci === 0) continue;
+      const bits = edgeTable[ci], tri0 = ni;
+      for (let e = 0; e < 12; e++) {
+        if (!(bits & (1 << e))) continue;
+        const a = q + off[eBase[e]], ax = eAxis[e];
+        const upper = a >= (k + 1) * S2, tab = upper ? eB : eA;
+        const key = (a - (upper ? k + 1 : k) * S2) * 3 + ax;
+        let id = tab[key];
+        if (id < 0) {
+          const va = val[a], vb = val[a + step[ax]], mu = va / (va - vb);
+          const ai = a % S, aj = ((a / S) | 0) % S, ak = (a / S2) | 0;
+          if (np + 3 > pos.length) { const g = new Float32Array(pos.length * 2); g.set(pos); pos = g; }
+          pos[np] = (ai + (ax === 0 ? mu : 0)) / N - 0.5;
+          pos[np + 1] = (aj + (ax === 1 ? mu : 0)) / N - 0.5;
+          pos[np + 2] = (ak + (ax === 2 ? mu : 0)) / N - 0.5;
+          id = np / 3; np += 3; tab[key] = id;
+        }
+        ev[e] = id;
+      }
+      for (let o = ci * 16; triTable[o] !== -1; o += 3) {
+        if (ni + 3 > idx.length) { const g = new Uint32Array(idx.length * 2); g.set(idx); idx = g; }
+        idx[ni++] = ev[triTable[o]]; idx[ni++] = ev[triTable[o + 2]]; idx[ni++] = ev[triTable[o + 1]];
+      }
+      // close the solid where this cube touches a face of the bounding cube
+      if (i > 0 && i < N - 1 && j > 0 && j < N - 1 && k > 0 && k < N - 1) continue;
+      for (let fc = 0; fc < 6; fc++) {
+        if (fc === 0 ? i !== 0 : fc === 1 ? i !== N - 1 : fc === 2 ? j !== 0 : fc === 3 ? j !== N - 1 : fc === 4 ? k !== 0 : k !== N - 1) continue;
+        const C = FC[fc], E = FE[fc];
+        let n = 0, ins = 0, mask = 0;
+        for (let c = 0; c < 4; c++) {
+          const s = q + off[C[c]], inside = val[s] > 0, nextIn = val[q + off[C[(c + 1) & 3]]] > 0;
+          if (inside) {
+            ins++; mask |= 1 << c;
+            poly[n++] = capVert(fc, capC[fc], s, (s % S) / N - 0.5, (((s / S) | 0) % S) / N - 0.5, ((s / S2) | 0) / N - 0.5);
+          }
+          if (inside !== nextIn) { const v = ev[E[c]] * 3; poly[n++] = capVert(fc, capX[fc], ev[E[c]], pos[v], pos[v + 1], pos[v + 2]); }
+        }
+        if (ins === 0) continue;
+        if (ins === 2 && (mask === 5 || mask === 10)) {
+          // two opposite corners inside: follow the choice marching cubes made for this face
+          const a = mask === 5 ? ev[E[0]] : ev[E[1]], b = mask === 5 ? ev[E[3]] : ev[E[0]];
+          let split = false;
+          for (let o = tri0; o < ni && !split; o += 3) for (let s = 0; s < 3; s++) {
+            const u = idx[o + s], w = idx[o + (s + 1) % 3];
+            if ((u === a && w === b) || (u === b && w === a)) { split = true; break; }
+          }
+          if (split) { if (mask === 5) { capTri(poly[0], poly[1], poly[5]); capTri(poly[3], poly[4], poly[2]); } else { capTri(poly[1], poly[2], poly[0]); capTri(poly[4], poly[5], poly[3]); } continue; }
+        }
+        for (let s = 1; s < n - 1; s++) capTri(poly[0], poly[s], poly[s + 1]);
+      }
+    }
+    const tmp = eA; eA = eB; eB = tmp; eB.fill(-1);
+  }
+  // surface normals (area weighted)
+  const nv = np / 3, nor = new Float32Array(np + cnp);
+  for (let o = 0; o < ni; o += 3) {
+    const a = idx[o] * 3, b = idx[o + 1] * 3, c = idx[o + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    nor[a] += nx; nor[a + 1] += ny; nor[a + 2] += nz;
+    nor[b] += nx; nor[b + 1] += ny; nor[b + 2] += nz;
+    nor[c] += nx; nor[c + 1] += ny; nor[c + 2] += nz;
+  }
+  for (let o = 0; o < np; o += 3) {
+    const d = Math.hypot(nor[o], nor[o + 1], nor[o + 2]) || 1;
+    nor[o] /= d; nor[o + 1] /= d; nor[o + 2] /= d;
+  }
+  const P = new Float32Array(np + cnp); P.set(pos.subarray(0, np)); P.set(cpos.subarray(0, cnp), np);
+  nor.set(cnor.subarray(0, cnp), np);
+  const I = new Uint32Array(ni + cni); I.set(idx.subarray(0, ni));
+  for (let o = 0; o < cni; o++) I[ni + o] = cidx[o] + nv;
+  return { pos: P, nor, idx: I };
+}
+
+// GLB (binary glTF 2.0), Y up, metres
+function baseColor(s) {
+  const m = s && /^#([0-9a-f]{6})$/i.exec(s.fg || '');
+  if (!m) return [0.82, 0.68, 0.5, 1];
+  const c = parseInt(m[1], 16), lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return [lin(c >> 16), lin(c >> 8 & 255), lin(c & 255), 1];
+}
+function writeGLB(pos, nor, idx, scale, settings) {
+  const nv = pos.length / 3;
+  const P = new Float32Array(pos.length), Nn = new Float32Array(nor.length);
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < nv; i++) {            // field Z becomes glTF Y
+    const x = pos[i*3] * scale, y = pos[i*3+2] * scale, z = -pos[i*3+1] * scale;
+    P[i*3] = x; P[i*3+1] = y; P[i*3+2] = z;
+    Nn[i*3] = nor[i*3]; Nn[i*3+1] = nor[i*3+2]; Nn[i*3+2] = -nor[i*3+1];
+    if (x < mn[0]) mn[0] = x; if (y < mn[1]) mn[1] = y; if (z < mn[2]) mn[2] = z;
+    if (x > mx[0]) mx[0] = x; if (y > mx[1]) mx[1] = y; if (z > mx[2]) mx[2] = z;
+  }
+  const bl = [P.byteLength, Nn.byteLength, idx.byteLength];
+  const binLen = bl[0] + bl[1] + bl[2];
+  const json = {
+    asset: { version: '2.0', generator: 'Cymatics 3D', extras: { cymatics: settings || null } },
+    scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name: 'cymatics' }],
+    materials: [{ name: 'cymatics', pbrMetallicRoughness: { baseColorFactor: baseColor(settings), metallicFactor: 0, roughnessFactor: 0.8 } }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+    buffers: [{ byteLength: binLen }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: bl[0], target: 34962 },
+      { buffer: 0, byteOffset: bl[0], byteLength: bl[1], target: 34962 },
+      { buffer: 0, byteOffset: bl[0] + bl[1], byteLength: bl[2], target: 34963 }],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: nv, type: 'VEC3', min: mn, max: mx },
+      { bufferView: 1, componentType: 5126, count: nv, type: 'VEC3' },
+      { bufferView: 2, componentType: 5125, count: idx.length, type: 'SCALAR' }]
+  };
+  let js = new TextEncoder().encode(JSON.stringify(json));
+  const jl = (js.length + 3) & ~3;
+  const out = new Uint8Array(12 + 8 + jl + 8 + binLen), dv = new DataView(out.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.length, true);
+  dv.setUint32(12, jl, true); dv.setUint32(16, 0x4E4F534A, true);
+  out.fill(0x20, 20, 20 + jl); out.set(js, 20);
+  let o = 20 + jl;
+  dv.setUint32(o, binLen, true); dv.setUint32(o + 4, 0x004E4942, true); o += 8;
+  out.set(new Uint8Array(P.buffer), o); out.set(new Uint8Array(Nn.buffer), o + bl[0]);
+  out.set(new Uint8Array(idx.buffer, idx.byteOffset, idx.byteLength), o + bl[0] + bl[1]);
+  return out;
+}
+
+// binary STL, Z up, mm
+function writeSTL(pos, idx, scale) {
+  const nt = idx.length / 3;
+  const out = new Uint8Array(84 + nt * 50), dv = new DataView(out.buffer);
+  dv.setUint32(80, nt, true);
+  let o = 84;
+  for (let t = 0; t < nt; t++) {
+    const a = idx[t*3] * 3, b = idx[t*3+1] * 3, c = idx[t*3+2] * 3;
+    const ux = pos[b]-pos[a], uy = pos[b+1]-pos[a+1], uz = pos[b+2]-pos[a+2];
+    const vx = pos[c]-pos[a], vy = pos[c+1]-pos[a+1], vz = pos[c+2]-pos[a+2];
+    let nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
+    const d = Math.hypot(nx, ny, nz) || 1;
+    dv.setFloat32(o, nx/d, true); dv.setFloat32(o+4, ny/d, true); dv.setFloat32(o+8, nz/d, true);
+    for (const q of [a, b, c]) {
+      dv.setFloat32(o+12, (pos[q]+0.5)*scale, true); dv.setFloat32(o+16, (pos[q+1]+0.5)*scale, true); dv.setFloat32(o+20, (pos[q+2]+0.5)*scale, true);
+      o += 12;
+    }
+    o += 14;
+  }
+  return out;
+}
+
+// stored ZIP (no compression), files = [[name, Uint8Array], ...]
+function zipStore(files) {
+  let tbl = zipStore.t;
+  if (!tbl) { tbl = zipStore.t = new Uint32Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; tbl[i] = c; } }
+  const enc = new TextEncoder(), ent = [];
+  let total = 22;
+  for (const [name, data] of files) {
+    let crc = -1; for (let i = 0; i < data.length; i++) crc = tbl[(crc ^ data[i]) & 255] ^ (crc >>> 8);
+    const nm = enc.encode(name); ent.push({ nm, data, crc: ~crc >>> 0 }); total += 30 + 46 + 2 * nm.length + data.length;
+  }
+  const out = new Uint8Array(total), dv = new DataView(out.buffer);
+  const hdr = (o, e) => {
+    dv.setUint16(o, 20, true); dv.setUint16(o + 8, 0x21, true);
+    dv.setUint32(o + 10, e.crc, true); dv.setUint32(o + 14, e.data.length, true); dv.setUint32(o + 18, e.data.length, true);
+    dv.setUint16(o + 22, e.nm.length, true);
+  };
+  let o = 0;
+  for (const e of ent) { e.at = o; dv.setUint32(o, 0x04034b50, true); hdr(o + 4, e); out.set(e.nm, o + 30); out.set(e.data, o + 30 + e.nm.length); o += 30 + e.nm.length + e.data.length; }
+  const cd = o;
+  for (const e of ent) { dv.setUint32(o, 0x02014b50, true); dv.setUint16(o + 4, 20, true); hdr(o + 6, e); dv.setUint32(o + 42, e.at, true); out.set(e.nm, o + 46); o += 46 + e.nm.length; }
+  dv.setUint32(o, 0x06054b50, true); dv.setUint16(o + 8, ent.length, true); dv.setUint16(o + 10, ent.length, true);
+  dv.setUint32(o + 12, o - cd, true); dv.setUint32(o + 16, cd, true);
+  return out;
+}
+let last = null, lastKey = '';
+onmessage = (e) => {
+  const d = e.data;
+  if (d.kind === 'mesh') {
+    const t0 = performance.now();
+    const m = buildMesh(d.p);
+    if (d.full) { last = { pos: m.pos.slice(), nor: m.nor.slice(), idx: m.idx.slice() }; lastKey = JSON.stringify(d.p); }
+    postMessage({ kind: 'mesh', id: d.id, full: d.full, ms: performance.now() - t0, ...m }, [m.pos.buffer, m.nor.buffer, m.idx.buffer]);
+  } else if (d.kind === 'export') {
+    if (lastKey !== JSON.stringify(d.p)) { last = buildMesh(d.p); lastKey = JSON.stringify(d.p); }
+    let bytes = d.fmt === 'glb' ? writeGLB(last.pos, last.nor, last.idx, d.size / 1000, d.settings) : writeSTL(last.pos, last.idx, d.size);
+    if (d.zip) bytes = zipStore([[d.name, bytes], [d.jsonName, new TextEncoder().encode(d.json)]]);
+    postMessage({ kind: 'export', bytes, name: d.name, zip: d.zip, fmt: d.fmt }, [bytes.buffer]);
+  }
+};
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = (id) => document.getElementById(id);
+const ids = ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness','fallAmt','res','size'];
+const fmt = (v) => String(+(+v).toFixed(2));
+
+// ---------- scene ----------
+const canvas = $('gl'), stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0xdfe2df);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
+camera.position.set(1.7, 1.15, 2.0);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.minDistance = 0.9; controls.maxDistance = 8;
+controls.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches; controls.autoRotateSpeed = 0.6;
+controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+const mat = new THREE.ShaderMaterial({
+  uniforms: { uLayers: { value: 16.7 }, uShow: { value: 1 }, uColor: { value: new THREE.Color('#eedec4') } },
+  vertexShader: `varying vec3 vN; varying vec3 vP; varying vec3 vV;
+    void main(){ vP = position; vN = normalize(normalMatrix * normal);
+      vec4 mv = modelViewMatrix * vec4(position,1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying vec3 vN; varying vec3 vP; varying vec3 vV; uniform float uLayers; uniform float uShow; uniform vec3 uColor;
+    void main(){
+      vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
+      vec3 v = normalize(vV);
+      float h = (vP.z + 0.5) * uLayers;            // height in sheets
+      float sheet = fract(h), ply = fract(h * 9.0); // 9 plies per sheet
+      float aa = fwidth(h) * 1.5;
+      float glue = 1.0 - smoothstep(0.0, 0.03 + aa, min(sheet, 1.0 - sheet));
+      float band = step(0.5, ply) * (1.0 - smoothstep(0.02, 0.12, fwidth(h * 9.0)));
+      float side = 1.0 - abs(normalize(cross(dFdx(vP), dFdy(vP))).z);   // plies only show on cut faces
+      vec3 wood = uColor;
+      wood = mix(wood, wood * 0.84, band * side * uShow);
+      wood = mix(wood, wood * 0.62, glue * side * uShow);
+      float key = max(dot(n, normalize(vec3(0.45, 0.8, 0.5))), 0.0);
+      float fill = max(dot(n, normalize(vec3(-0.6, 0.2, -0.4))), 0.0);
+      float sky = 0.5 + 0.5 * n.y;
+      vec3 c = wood * (0.30 + 0.25 * sky + 0.62 * key + 0.16 * fill);
+      c += 0.06 * pow(1.0 - max(dot(n, v), 0.0), 3.0);
+      gl_FragColor = vec4(pow(c, vec3(1.0/2.2)) , 1.0);
+    }`,
+  side: THREE.DoubleSide
+});
+const geo = new THREE.BufferGeometry();
+const mesh = new THREE.Mesh(geo, mat);
+mesh.rotation.x = -Math.PI / 2;      // field Z points up
+mesh.frustumCulled = false;
+scene.add(mesh);
+const boxMat = new THREE.LineBasicMaterial({ color: 0x9aa39c });
+const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), boxMat);
+scene.add(box);
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+// ---------- worker ----------
+const src = $('core').textContent;
+const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+let jobId = 0, running = false, queued = null, fullTimer = 0, exporting = null;
+
+function params(resOverride) {
+  const p = { type: $('type').value, shape: $('shape').value };
+  for (const k of ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness']) p[k] = +$(k).value;
+  for (const k of ['mx','my','mz','fall']) p[k] = $(k).checked;
+  p.fallShape = $('fallShape').value; p.fallAmt = +$('fallAmt').value;
+  p.res = resOverride || +$('res').value;
+  return p;
+}
+function send(job) {
+  if (running) { queued = job; return; }
+  running = true; $('busy').classList.add('on');
+  worker.postMessage(job);
+}
+function requestMesh(full) {
+  const p = params(full ? 0 : Math.min(+$('res').value, 48));
+  send({ kind: 'mesh', id: ++jobId, full, p });
+}
+function update(live) {
+  syncLabels();
+  clearTimeout(fullTimer);
+  if (live) { requestMesh(false); fullTimer = setTimeout(() => requestMesh(true), 350); }
+  else requestMesh(true);
+}
+worker.onmessage = (e) => {
+  const d = e.data;
+  running = false;
+  if (d.kind === 'mesh') {
+    geo.setAttribute('position', new THREE.BufferAttribute(d.pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(d.nor, 3));
+    geo.setIndex(new THREE.BufferAttribute(d.idx, 1));
+    if (d.full) {
+      $('hV').textContent = (d.pos.length / 3).toLocaleString('en-US');
+      $('hT').textContent = (d.idx.length / 3).toLocaleString('en-US');
+      $('hMs').textContent = Math.round(d.ms);
+      $('hW').textContent = d.idx.length ? 'closed' : 'empty';
+    }
+  } else if (d.kind === 'export' && exporting) { exporting(d); exporting = null; }
+  if (queued) { const j = queued; queued = null; send(j); }
+  else $('busy').classList.remove('on');
+};
+worker.onerror = (e) => { running = false; $('busy').classList.remove('on'); say('Could not build the mesh: ' + e.message); };
+
+// ---------- UI ----------
+function syncLabels() {
+  for (const k of ids) document.querySelector(`output[for=${k}]`).textContent = k === 'mix' ? Math.round($(k).value * 100) + '%' : fmt($(k).value);
+  const off = +$('mix').value === 0;
+  document.querySelectorAll('[data-b]').forEach((r) => r.classList.toggle('dim', off));
+  document.querySelectorAll('[data-f]').forEach((r) => r.classList.toggle('dim', !$('fall').checked));
+  const a = ['l','m','n'].map((k) => fmt($(k).value)).join('·');
+  const b = ['l2','m2','n2'].map((k) => fmt($(k).value)).join('·');
+  const mir = ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
+  $('hMode').textContent = ($('type').value === 'gyroid' ? 'gyroid ' : '') + a + (off ? '' : ' + ' + b) + (mir ? ' mirror ' + mir : '');
+  mat.uniforms.uLayers.value = +$('size').value / 18;
+  mat.uniforms.uShow.value = $('layers').checked ? 1 : 0;
+  const fg = $('fg').value, bg = $('bg').value;
+  mat.uniforms.uColor.value.set(fg); renderer.setClearColor(bg);
+  document.querySelector('output[for=fg]').textContent = fg; document.querySelector('output[for=bg]').textContent = bg;
+  const c = parseInt(bg.slice(1), 16), lum = (0.299 * (c >> 16) + 0.587 * (c >> 8 & 255) + 0.114 * (c & 255)) / 255, dark = lum < 0.5;
+  stage.style.setProperty('--hud', dark ? 'rgba(255,255,255,.62)' : 'rgba(0,0,0,.55)');
+  stage.style.setProperty('--hud-strong', dark ? '#fff' : '#111');
+  boxMat.color.set(dark ? 0xffffff : 0x000000); boxMat.transparent = true; boxMat.opacity = 0.28;
+}
+for (const k of ids) {
+  const el = $(k), geom = k !== 'size';
+  el.addEventListener('input', () => geom ? update(true) : syncLabels());
+}
+for (const k of ['type','shape','mx','my','mz','fall','fallShape']) $(k).addEventListener('change', () => update(false));
+$('layers').addEventListener('change', syncLabels);
+for (const k of ['fg','bg']) $(k).addEventListener('input', syncLabels);
+// remember which groups are open
+let openState = {}; try { openState = JSON.parse(localStorage.getItem('cymatics-groups') || '{}'); } catch (_) {}
+document.querySelectorAll('.grp').forEach((g) => {
+  if (g.dataset.g in openState) g.open = !!openState[g.dataset.g];
+  g.addEventListener('toggle', () => { openState[g.dataset.g] = g.open; hideTip(); try { localStorage.setItem('cymatics-groups', JSON.stringify(openState)); } catch (_) {} });
+});
+
+const presets = [
+  ['3·2·1', { type:'chladni', l:3, m:2, n:1, mix:0, thickness:0.4, shape:'shell' }],
+  ['5·3·1', { type:'chladni', l:5, m:3, n:1, mix:0, thickness:0.3, shape:'shell' }],
+  ['4·4·2', { type:'chladni', l:4, m:4, n:2, mix:0, thickness:0.35, shape:'shell' }],
+  ['2·1·0 + 1·4·2', { type:'chladni', l:2, m:1, n:0, l2:1, m2:4, n2:2, mix:0.45, thickness:0.3, shape:'shell' }],
+  ['gyroid', { type:'gyroid', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.55, shape:'shell' }],
+  ['mirrored gyroid', { type:'gyroid', l:1.5, m:1.5, n:1, mix:0, thickness:0.6, shape:'shell', mx:true, my:true }],
+  ['soft block', { type:'gyroid', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.7, shape:'shell', mx:true, my:true, fall:true, fallShape:'rbox', fallAmt:0.45 }],
+  ['bubbles', { type:'chladni', l:3, m:3, n:1, mix:0, thickness:-0.2, shape:'solid' }],
+];
+function apply(v) {
+  for (const k of ['ox','oy','oz']) $(k).value = 0;
+  for (const k of ['mx','my','mz','fall']) $(k).checked = false;
+  for (const k in v) { const el = $(k); if (el.type === 'checkbox') el.checked = !!v[k]; else el.value = v[k]; }
+  update(false);
+}
+for (const [name, v] of presets) {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = name;
+  b.addEventListener('click', () => apply(v)); $('presets').append(b);
+}
+const rnd = document.createElement('button'); rnd.type = 'button'; rnd.textContent = 'randomize';
+rnd.addEventListener('click', () => {
+  const r = (a, b) => Math.round((a + Math.random() * (b - a)) * 2) / 2;
+  apply({ type:'chladni', l:r(1,6), m:r(0,5), n:r(0,4), l2:r(0,5), m2:r(0,5), n2:r(0,5), mix: Math.random() < 0.5 ? 0 : +(0.2 + Math.random() * 0.4).toFixed(2), thickness: +(0.25 + Math.random() * 0.25).toFixed(2), shape:'shell' });
+});
+$('presets').append(rnd);
+$('panel').addEventListener('submit', (e) => e.preventDefault());
+
+// ---------- help ----------
+const tips = {
+  type: ['Field', 'The wave that fills the cube. Chladni adds three cosine standing waves, like the resonant modes of air in a cubic room. Gyroid is a twisting, channel-like surface with no mirror planes of its own.'],
+  l: ['l', 'First wave number. Higher values pack more nodes into the cube, so you get more walls and holes, each one thinner. In Chladni it counts half-waves across the cube and is cycled through all three axes with m and n. In Gyroid it sets the number of periods along X.'],
+  m: ['m', 'Second wave number. Works like l. In Gyroid it sets the number of periods along Y. Making l, m and n different from each other gives less regular shapes.'],
+  n: ['n', 'Third wave number. Works like l. In Gyroid it sets the number of periods along Z. At 0 the wave stops varying in that direction. Values between whole numbers (1.3, 2.5) break the symmetry.'],
+  mirrorLab: ['Mirror', 'Reflects the shape across the middle plane of that axis, so one half becomes the mirror image of the other and a crease appears where they meet. Most visible with Gyroid, with fractional wave numbers or with an offset.'],
+  ox: ['Offset X', 'Slides the cube along X through the wave, as a fraction of the cube edge. The wave stays put and the cube cuts a different piece of it, so you can travel along the shape. With Mirror on, the mirror plane stays in the middle.'],
+  oy: ['Offset Y', 'Slides the cube along Y through the wave. Works like Offset X.'],
+  oz: ['Offset Z', 'Slides the cube along Z through the wave, like moving the cut up or down. Works like Offset X.'],
+  fall: ['Falloff', 'Instead of being cut flat by the cube, the solid thins out and closes on its own before it reaches an outer shape. Gives rounded, finished ends with no flat cut faces.'],
+  fallShape: ['Outer shape', 'The invisible shape the solid fades toward. It sits inside the cube and touches its faces. The solid never reaches it.'],
+  fallAmt: ['Influence', 'How deep inside the outer shape the fade begins. Low values keep the solid full and close it abruptly near the edge. High values start thinning it from the centre, leaving a smaller, softer piece.'],
+  mix: ['Mix', 'Blends a second wave into the first. 0% uses only l, m, n. 50% weighs both modes equally. Mixing gives less symmetric, more organic shapes.'],
+  l2: ['l₂', 'First wave number of the second mode. Only has an effect when Mix is above 0%.'],
+  m2: ['m₂', 'Second wave number of the second mode. Only has an effect when Mix is above 0%.'],
+  n2: ['n₂', 'Third wave number of the second mode. Only has an effect when Mix is above 0%.'],
+  shape: ['Shape', 'Where the material goes. Shell keeps material close to the nodal surface, where the wave is near zero, like the sand lines on a Chladni plate. Volume keeps everything on one side of the wave.'],
+  thickness: ['Thickness', 'In Shell, how far from the nodal surface the material reaches: higher means thicker walls and smaller holes. In Volume, the cut level of the wave: higher fills more of the cube. Negative values only work in Volume.'],
+  res: ['Resolution', 'Grid cells along each edge of the cube. Higher gives smoother surfaces but takes longer and makes heavier files. While you drag a slider the preview runs at 48.'],
+  size: ['Edge (mm)', 'Real edge length of the cube in the exported file. It does not change the shape, only the scale and the number of plywood sheets drawn.'],
+  fg: ['Object colour', 'Colour of the solid in the preview. It is also written to the GLB as its material colour. STL files carry no colour.'],
+  bg: ['Background colour', 'Colour behind the solid in the preview. It is not part of any exported model.'],
+  layers: ['Plywood sheets', 'Draws the glue lines of stacked 18 mm sheets on the cut faces, to preview a laminated CNC build. Visual only, not part of the exported mesh.']
+};
+const tip = $('tip'); let tipFor = null;
+function showTip(btn) {
+  const [title, text] = tips[btn.dataset.k];
+  tip.innerHTML = ''; const b = document.createElement('b'); b.textContent = title; tip.append(b, text);
+  tip.classList.add('on'); tipFor = btn; btn.setAttribute('aria-expanded', 'true');
+  const r = btn.getBoundingClientRect(), w = tip.offsetWidth, hgt = tip.offsetHeight;
+  let x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+  let y = r.bottom + 8; if (y + hgt > innerHeight - 8) y = Math.max(8, r.top - hgt - 8);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { if (tipFor) tipFor.setAttribute('aria-expanded', 'false'); tipFor = null; tip.classList.remove('on'); }
+for (const k in tips) {
+  const target = $(k).closest('.lab') || document.querySelector(`label[for=${k}]`);
+  let lab = target;
+  if (!target.classList.contains('lab')) { lab = document.createElement('span'); lab.className = 'lab'; target.replaceWith(lab); lab.append(target); }
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'help'; btn.textContent = '?'; btn.dataset.k = k;
+  btn.setAttribute('aria-label', 'What does ' + tips[k][0] + ' change?'); btn.setAttribute('aria-describedby', 'tip'); btn.setAttribute('aria-expanded', 'false');
+  btn.addEventListener('mouseenter', () => showTip(btn)); btn.addEventListener('mouseleave', hideTip);
+  btn.addEventListener('focus', () => showTip(btn)); btn.addEventListener('blur', hideTip);
+  btn.addEventListener('click', () => tipFor === btn && !btn.matches(':hover') ? hideTip() : showTip(btn));
+  lab.append(btn);
+}
+$('panel').addEventListener('scroll', hideTip);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
+
+// ---------- settings ----------
+const nums = ['l','m','n','ox','oy','oz','mix','l2','m2','n2','thickness','fallAmt','res','size'], sels = ['type','shape','fallShape'], bools = ['mx','my','mz','fall','layers'];
+function getSettings() {
+  const s = { app: 'cymatics3d', version: 1 };
+  for (const k of sels) s[k] = $(k).value;
+  for (const k of nums) s[k] = +$(k).value;
+  for (const k of bools) s[k] = $(k).checked;
+  s.fg = $('fg').value; s.bg = $('bg').value;
+  return s;
+}
+function applySettings(s) {
+  if (!s || typeof s !== 'object' || !['l','m','n'].every((k) => Number.isFinite(+s[k]))) throw new Error('no settings');
+  for (const k of sels) if ([...$(k).options].some((o) => o.value === s[k])) $(k).value = s[k];
+  for (const k of ['ox','oy','oz']) $(k).value = 0;
+  $('fall').checked = false;
+  for (const k of nums) if (Number.isFinite(+s[k]) && s[k] !== null) $(k).value = +s[k];
+  for (const k of bools) if (k in s) $(k).checked = !!s[k];
+  for (const k of ['fg','bg']) if (/^#[0-9a-f]{6}$/i.test(s[k])) $(k).value = s[k].toLowerCase();
+  update(false);
+}
+function baseName() {
+  const p = params(), mir = mirTag();
+  return `cymatics_${p.type}_${[p.l, p.m, p.n].join('-')}` + (p.mix > 0 ? '_' + [p.l2, p.m2, p.n2].join('-') : '') + (mir ? '_mirror' + mir : '') + (p.ox || p.oy || p.oz ? '_offset' + [p.ox, p.oy, p.oz].join('_') : '') + (p.fall ? '_falloff-' + p.fallShape : '');
+}
+// settings from a .json, from a .glb exported here, or from the .json inside an exported .zip
+function settingsFromBytes(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), dec = new TextDecoder();
+  const sig = u8.length >= 4 ? dv.getUint32(0, true) : 0;
+  if (sig === 0x46546C67) {
+    const j = JSON.parse(dec.decode(u8.subarray(20, 20 + dv.getUint32(12, true))));
+    return j.asset && j.asset.extras && j.asset.extras.cymatics;
+  }
+  if (sig === 0x04034b50) {
+    let o = 0;
+    while (o + 30 <= u8.length && dv.getUint32(o, true) === 0x04034b50) {
+      const size = dv.getUint32(o + 18, true), nl = dv.getUint16(o + 26, true), xl = dv.getUint16(o + 28, true);
+      const name = dec.decode(u8.subarray(o + 30, o + 30 + nl)), at = o + 30 + nl + xl;
+      if (name.endsWith('.json') && dv.getUint16(o + 8, true) === 0) return JSON.parse(dec.decode(u8.subarray(at, at + size)));
+      o = at + size;
+    }
+    return null;
+  }
+  return JSON.parse(dec.decode(u8));
+}
+const sSay = (t) => { $('sMsg').textContent = t; };
+async function loadFile(file) {
+  try {
+    applySettings(settingsFromBytes(new Uint8Array(await file.arrayBuffer())));
+    sSay('Loaded settings from ' + file.name + '.');
+  } catch (_) { sSay('No Cymatics 3D settings found in ' + file.name + '. Use a .json saved here, or a .zip or .glb exported here.'); }
+}
+async function getCap() {
+  try { if (window.claude && window.claude.use) return await window.claude.use('downloads'); } catch (_) {}
+  return null;
+}
+function anchorSave(name, data, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+const failText = (err) => {
+  const c = err && err.code;
+  return c === 'declined' ? 'Cancelled.' : c === 'rate_limited' ? 'A download prompt is already open. Answer it and try again.' : 'The file could not be saved here' + (c ? ' (' + c + ').' : '.');
+};
+$('sSave').addEventListener('click', async () => {
+  const name = baseName() + '.json', json = JSON.stringify(getSettings(), null, 2);
+  try {
+    const cap = await getCap();
+    if (cap) { await cap.save({ filename: name, data: json }); sSay('Saved ' + name + '.'); }
+    else { anchorSave(name, json, 'application/json'); sSay(name + ' sent to download. If nothing downloaded, open this page outside the chat panel.'); }
+  } catch (err) { sSay(failText(err)); }
+});
+$('sLoad').addEventListener('click', () => $('sFile').click());
+$('sFile').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = ''; });
+let dragDepth = 0;
+const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+addEventListener('dragenter', (e) => { if (hasFiles(e)) { e.preventDefault(); dragDepth++; $('drop').classList.add('on'); } });
+addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+addEventListener('dragleave', (e) => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; $('drop').classList.remove('on'); } });
+addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; $('drop').classList.remove('on');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+// ---------- export ----------
+const say = (t) => { $('msg').textContent = t; };
+const mirTag = () => ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
+async function exportAs(fmtName) {
+  const btns = [$('xGlb'), $('xStl')]; btns.forEach((b) => b.disabled = true);
+  try {
+    const cap = await getCap();
+    const p = params(), base = baseName() + '_' + $('size').value + 'mm', name = base + '.' + fmtName;
+    const settings = getSettings(), json = JSON.stringify(settings, null, 2);
+    say('Building ' + fmtName.toUpperCase() + ' at resolution ' + p.res + '…');
+    clearTimeout(fullTimer);
+    const d = await new Promise((res) => { exporting = res; send({ kind: 'export', fmt: fmtName, p, size: +$('size').value, name, zip: !!cap, settings, json, jsonName: base + '.json' }); });
+    const mb = (d.bytes.length / 1048576).toFixed(1) + ' MB';
+    if (cap) {
+      await cap.save({ filename: base + '_' + fmtName + '.zip', data: new Blob([d.bytes]) });
+      say(`Saved ${name} and its settings .json in one .zip (${mb}).`);
+    } else {
+      anchorSave(name, d.bytes, fmtName === 'glb' ? 'model/gltf-binary' : 'model/stl');
+      anchorSave(base + '.json', json, 'application/json');
+      say(`${name} (${mb}) and its settings .json sent to download. If nothing downloaded, open this page outside the chat panel.`);
+    }
+  } catch (err) { say(failText(err)); }
+  finally { btns.forEach((b) => b.disabled = false); }
+}
+$('xGlb').addEventListener('click', () => exportAs('glb'));
+$('xStl').addEventListener('click', () => exportAs('stl'));
+
+update(false);
+</script>
+</body>
+</html>
