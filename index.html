@@ -85,13 +85,16 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
     <h1>Cymatics 3D</h1>
     <p class="sub">Nodal surface of a standing wave inside a cube. Drag to rotate, scroll to zoom.</p>
   </div>
-  <div class="chips" id="presets" aria-label="Presets"></div>
+  <details class="grp" data-g="Templates" open>
+    <summary>Templates</summary>
+    <div class="body"><div class="chips" id="presets" aria-label="Templates"></div></div>
+  </details>
 
   <details class="grp" data-g="Wave" open>
     <summary>Wave</summary>
     <div class="body">
     <div class="row"><label for="type">Field</label>
-      <select id="type"><option value="chladni">Chladni (cube)</option><option value="gyroid">Gyroid</option></select></div>
+      <select id="type"><option value="chladni">Chladni (cube modes)</option><option value="sphere">Sphere modes</option><option value="gyroid">Gyroid</option><option value="schwarzp">Schwarz P</option><option value="diamond">Schwarz D (diamond)</option><option value="neovius">Neovius</option></select></div>
     <div class="row"><label for="l">l</label><input type="range" id="l" min="0" max="8" step="0.1" value="3"><output for="l"></output></div>
     <div class="row"><label for="m">m</label><input type="range" id="m" min="0" max="8" step="0.1" value="2"><output for="m"></output></div>
     <div class="row"><label for="n">n</label><input type="range" id="n" min="0" max="8" step="0.1" value="1"><output for="n"></output></div>
@@ -131,7 +134,7 @@ select{width:100%;grid-column:2 / 4;background:#fff;border:1px solid var(--line)
     <div class="body">
     <span class="lab"><label class="check"><input type="checkbox" id="fall"> Fade out toward an outer shape</label></span>
     <div class="row" data-f><label for="fallShape">Outer shape</label>
-      <select id="fallShape"><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="rbox">Rounded cube</option></select></div>
+      <select id="fallShape"><option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="rbox">Rounded cube</option></select></div>
     <div class="row" data-f><label for="fallAmt">Influence</label><input type="range" id="fallAmt" min="0.05" max="1" step="0.01" value="0.4"><output for="fallAmt"></output></div>
   </div>
   </details>
@@ -176,6 +179,45 @@ const edgeTable=new Int32Array([0x0,0x109,0x203,0x30a,0x406,0x50f,0x605,0x70c,0x
 const triTable=new Int32Array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,8,3,9,8,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,1,2,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,2,10,0,2,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,8,3,2,10,8,10,9,8,-1,-1,-1,-1,-1,-1,-1,3,11,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,11,2,8,11,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,9,0,2,3,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,11,2,1,9,11,9,8,11,-1,-1,-1,-1,-1,-1,-1,3,10,1,11,10,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,10,1,0,8,10,8,11,10,-1,-1,-1,-1,-1,-1,-1,3,9,0,3,11,9,11,10,9,-1,-1,-1,-1,-1,-1,-1,9,8,10,10,8,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,7,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,3,0,7,3,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,8,4,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,1,9,4,7,1,7,3,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,8,4,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,4,7,3,0,4,1,2,10,-1,-1,-1,-1,-1,-1,-1,9,2,10,9,0,2,8,4,7,-1,-1,-1,-1,-1,-1,-1,2,10,9,2,9,7,2,7,3,7,9,4,-1,-1,-1,-1,8,4,7,3,11,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,4,7,11,2,4,2,0,4,-1,-1,-1,-1,-1,-1,-1,9,0,1,8,4,7,2,3,11,-1,-1,-1,-1,-1,-1,-1,4,7,11,9,4,11,9,11,2,9,2,1,-1,-1,-1,-1,3,10,1,3,11,10,7,8,4,-1,-1,-1,-1,-1,-1,-1,1,11,10,1,4,11,1,0,4,7,11,4,-1,-1,-1,-1,4,7,8,9,0,11,9,11,10,11,0,3,-1,-1,-1,-1,4,7,11,4,11,9,9,11,10,-1,-1,-1,-1,-1,-1,-1,9,5,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,5,4,0,8,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,5,4,1,5,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,5,4,8,3,5,3,1,5,-1,-1,-1,-1,-1,-1,-1,1,2,10,9,5,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,8,1,2,10,4,9,5,-1,-1,-1,-1,-1,-1,-1,5,2,10,5,4,2,4,0,2,-1,-1,-1,-1,-1,-1,-1,2,10,5,3,2,5,3,5,4,3,4,8,-1,-1,-1,-1,9,5,4,2,3,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,11,2,0,8,11,4,9,5,-1,-1,-1,-1,-1,-1,-1,0,5,4,0,1,5,2,3,11,-1,-1,-1,-1,-1,-1,-1,2,1,5,2,5,8,2,8,11,4,8,5,-1,-1,-1,-1,10,3,11,10,1,3,9,5,4,-1,-1,-1,-1,-1,-1,-1,4,9,5,0,8,1,8,10,1,8,11,10,-1,-1,-1,-1,5,4,0,5,0,11,5,11,10,11,0,3,-1,-1,-1,-1,5,4,8,5,8,10,10,8,11,-1,-1,-1,-1,-1,-1,-1,9,7,8,5,7,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,3,0,9,5,3,5,7,3,-1,-1,-1,-1,-1,-1,-1,0,7,8,0,1,7,1,5,7,-1,-1,-1,-1,-1,-1,-1,1,5,3,3,5,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,7,8,9,5,7,10,1,2,-1,-1,-1,-1,-1,-1,-1,10,1,2,9,5,0,5,3,0,5,7,3,-1,-1,-1,-1,8,0,2,8,2,5,8,5,7,10,5,2,-1,-1,-1,-1,2,10,5,2,5,3,3,5,7,-1,-1,-1,-1,-1,-1,-1,7,9,5,7,8,9,3,11,2,-1,-1,-1,-1,-1,-1,-1,9,5,7,9,7,2,9,2,0,2,7,11,-1,-1,-1,-1,2,3,11,0,1,8,1,7,8,1,5,7,-1,-1,-1,-1,11,2,1,11,1,7,7,1,5,-1,-1,-1,-1,-1,-1,-1,9,5,8,8,5,7,10,1,3,10,3,11,-1,-1,-1,-1,5,7,0,5,0,9,7,11,0,1,0,10,11,10,0,-1,11,10,0,11,0,3,10,5,0,8,0,7,5,7,0,-1,11,10,5,7,11,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,10,6,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,5,10,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,0,1,5,10,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,8,3,1,9,8,5,10,6,-1,-1,-1,-1,-1,-1,-1,1,6,5,2,6,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,6,5,1,2,6,3,0,8,-1,-1,-1,-1,-1,-1,-1,9,6,5,9,0,6,0,2,6,-1,-1,-1,-1,-1,-1,-1,5,9,8,5,8,2,5,2,6,3,2,8,-1,-1,-1,-1,2,3,11,10,6,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,0,8,11,2,0,10,6,5,-1,-1,-1,-1,-1,-1,-1,0,1,9,2,3,11,5,10,6,-1,-1,-1,-1,-1,-1,-1,5,10,6,1,9,2,9,11,2,9,8,11,-1,-1,-1,-1,6,3,11,6,5,3,5,1,3,-1,-1,-1,-1,-1,-1,-1,0,8,11,0,11,5,0,5,1,5,11,6,-1,-1,-1,-1,3,11,6,0,3,6,0,6,5,0,5,9,-1,-1,-1,-1,6,5,9,6,9,11,11,9,8,-1,-1,-1,-1,-1,-1,-1,5,10,6,4,7,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,3,0,4,7,3,6,5,10,-1,-1,-1,-1,-1,-1,-1,1,9,0,5,10,6,8,4,7,-1,-1,-1,-1,-1,-1,-1,10,6,5,1,9,7,1,7,3,7,9,4,-1,-1,-1,-1,6,1,2,6,5,1,4,7,8,-1,-1,-1,-1,-1,-1,-1,1,2,5,5,2,6,3,0,4,3,4,7,-1,-1,-1,-1,8,4,7,9,0,5,0,6,5,0,2,6,-1,-1,-1,-1,7,3,9,7,9,4,3,2,9,5,9,6,2,6,9,-1,3,11,2,7,8,4,10,6,5,-1,-1,-1,-1,-1,-1,-1,5,10,6,4,7,2,4,2,0,2,7,11,-1,-1,-1,-1,0,1,9,4,7,8,2,3,11,5,10,6,-1,-1,-1,-1,9,2,1,9,11,2,9,4,11,7,11,4,5,10,6,-1,8,4,7,3,11,5,3,5,1,5,11,6,-1,-1,-1,-1,5,1,11,5,11,6,1,0,11,7,11,4,0,4,11,-1,0,5,9,0,6,5,0,3,6,11,6,3,8,4,7,-1,6,5,9,6,9,11,4,7,9,7,11,9,-1,-1,-1,-1,10,4,9,6,4,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,10,6,4,9,10,0,8,3,-1,-1,-1,-1,-1,-1,-1,10,0,1,10,6,0,6,4,0,-1,-1,-1,-1,-1,-1,-1,8,3,1,8,1,6,8,6,4,6,1,10,-1,-1,-1,-1,1,4,9,1,2,4,2,6,4,-1,-1,-1,-1,-1,-1,-1,3,0,8,1,2,9,2,4,9,2,6,4,-1,-1,-1,-1,0,2,4,4,2,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,3,2,8,2,4,4,2,6,-1,-1,-1,-1,-1,-1,-1,10,4,9,10,6,4,11,2,3,-1,-1,-1,-1,-1,-1,-1,0,8,2,2,8,11,4,9,10,4,10,6,-1,-1,-1,-1,3,11,2,0,1,6,0,6,4,6,1,10,-1,-1,-1,-1,6,4,1,6,1,10,4,8,1,2,1,11,8,11,1,-1,9,6,4,9,3,6,9,1,3,11,6,3,-1,-1,-1,-1,8,11,1,8,1,0,11,6,1,9,1,4,6,4,1,-1,3,11,6,3,6,0,0,6,4,-1,-1,-1,-1,-1,-1,-1,6,4,8,11,6,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,10,6,7,8,10,8,9,10,-1,-1,-1,-1,-1,-1,-1,0,7,3,0,10,7,0,9,10,6,7,10,-1,-1,-1,-1,10,6,7,1,10,7,1,7,8,1,8,0,-1,-1,-1,-1,10,6,7,10,7,1,1,7,3,-1,-1,-1,-1,-1,-1,-1,1,2,6,1,6,8,1,8,9,8,6,7,-1,-1,-1,-1,2,6,9,2,9,1,6,7,9,0,9,3,7,3,9,-1,7,8,0,7,0,6,6,0,2,-1,-1,-1,-1,-1,-1,-1,7,3,2,6,7,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,11,10,6,8,10,8,9,8,6,7,-1,-1,-1,-1,2,0,7,2,7,11,0,9,7,6,7,10,9,10,7,-1,1,8,0,1,7,8,1,10,7,6,7,10,2,3,11,-1,11,2,1,11,1,7,10,6,1,6,7,1,-1,-1,-1,-1,8,9,6,8,6,7,9,1,6,11,6,3,1,3,6,-1,0,9,1,11,6,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,8,0,7,0,6,3,11,0,11,6,0,-1,-1,-1,-1,7,11,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,6,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,8,11,7,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,9,11,7,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,1,9,8,3,1,11,7,6,-1,-1,-1,-1,-1,-1,-1,10,1,2,6,11,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,10,3,0,8,6,11,7,-1,-1,-1,-1,-1,-1,-1,2,9,0,2,10,9,6,11,7,-1,-1,-1,-1,-1,-1,-1,6,11,7,2,10,3,10,8,3,10,9,8,-1,-1,-1,-1,7,2,3,6,2,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,0,8,7,6,0,6,2,0,-1,-1,-1,-1,-1,-1,-1,2,7,6,2,3,7,0,1,9,-1,-1,-1,-1,-1,-1,-1,1,6,2,1,8,6,1,9,8,8,7,6,-1,-1,-1,-1,10,7,6,10,1,7,1,3,7,-1,-1,-1,-1,-1,-1,-1,10,7,6,1,7,10,1,8,7,1,0,8,-1,-1,-1,-1,0,3,7,0,7,10,0,10,9,6,10,7,-1,-1,-1,-1,7,6,10,7,10,8,8,10,9,-1,-1,-1,-1,-1,-1,-1,6,8,4,11,8,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,6,11,3,0,6,0,4,6,-1,-1,-1,-1,-1,-1,-1,8,6,11,8,4,6,9,0,1,-1,-1,-1,-1,-1,-1,-1,9,4,6,9,6,3,9,3,1,11,3,6,-1,-1,-1,-1,6,8,4,6,11,8,2,10,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,3,0,11,0,6,11,0,4,6,-1,-1,-1,-1,4,11,8,4,6,11,0,2,9,2,10,9,-1,-1,-1,-1,10,9,3,10,3,2,9,4,3,11,3,6,4,6,3,-1,8,2,3,8,4,2,4,6,2,-1,-1,-1,-1,-1,-1,-1,0,4,2,4,6,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,9,0,2,3,4,2,4,6,4,3,8,-1,-1,-1,-1,1,9,4,1,4,2,2,4,6,-1,-1,-1,-1,-1,-1,-1,8,1,3,8,6,1,8,4,6,6,10,1,-1,-1,-1,-1,10,1,0,10,0,6,6,0,4,-1,-1,-1,-1,-1,-1,-1,4,6,3,4,3,8,6,10,3,0,3,9,10,9,3,-1,10,9,4,6,10,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,9,5,7,6,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,3,4,9,5,11,7,6,-1,-1,-1,-1,-1,-1,-1,5,0,1,5,4,0,7,6,11,-1,-1,-1,-1,-1,-1,-1,11,7,6,8,3,4,3,5,4,3,1,5,-1,-1,-1,-1,9,5,4,10,1,2,7,6,11,-1,-1,-1,-1,-1,-1,-1,6,11,7,1,2,10,0,8,3,4,9,5,-1,-1,-1,-1,7,6,11,5,4,10,4,2,10,4,0,2,-1,-1,-1,-1,3,4,8,3,5,4,3,2,5,10,5,2,11,7,6,-1,7,2,3,7,6,2,5,4,9,-1,-1,-1,-1,-1,-1,-1,9,5,4,0,8,6,0,6,2,6,8,7,-1,-1,-1,-1,3,6,2,3,7,6,1,5,0,5,4,0,-1,-1,-1,-1,6,2,8,6,8,7,2,1,8,4,8,5,1,5,8,-1,9,5,4,10,1,6,1,7,6,1,3,7,-1,-1,-1,-1,1,6,10,1,7,6,1,0,7,8,7,0,9,5,4,-1,4,0,10,4,10,5,0,3,10,6,10,7,3,7,10,-1,7,6,10,7,10,8,5,4,10,4,8,10,-1,-1,-1,-1,6,9,5,6,11,9,11,8,9,-1,-1,-1,-1,-1,-1,-1,3,6,11,0,6,3,0,5,6,0,9,5,-1,-1,-1,-1,0,11,8,0,5,11,0,1,5,5,6,11,-1,-1,-1,-1,6,11,3,6,3,5,5,3,1,-1,-1,-1,-1,-1,-1,-1,1,2,10,9,5,11,9,11,8,11,5,6,-1,-1,-1,-1,0,11,3,0,6,11,0,9,6,5,6,9,1,2,10,-1,11,8,5,11,5,6,8,0,5,10,5,2,0,2,5,-1,6,11,3,6,3,5,2,10,3,10,5,3,-1,-1,-1,-1,5,8,9,5,2,8,5,6,2,3,8,2,-1,-1,-1,-1,9,5,6,9,6,0,0,6,2,-1,-1,-1,-1,-1,-1,-1,1,5,8,1,8,0,5,6,8,3,8,2,6,2,8,-1,1,5,6,2,1,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,3,6,1,6,10,3,8,6,5,6,9,8,9,6,-1,10,1,0,10,0,6,9,5,0,5,6,0,-1,-1,-1,-1,0,3,8,5,6,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,10,5,6,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,5,10,7,5,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,5,10,11,7,5,8,3,0,-1,-1,-1,-1,-1,-1,-1,5,11,7,5,10,11,1,9,0,-1,-1,-1,-1,-1,-1,-1,10,7,5,10,11,7,9,8,1,8,3,1,-1,-1,-1,-1,11,1,2,11,7,1,7,5,1,-1,-1,-1,-1,-1,-1,-1,0,8,3,1,2,7,1,7,5,7,2,11,-1,-1,-1,-1,9,7,5,9,2,7,9,0,2,2,11,7,-1,-1,-1,-1,7,5,2,7,2,11,5,9,2,3,2,8,9,8,2,-1,2,5,10,2,3,5,3,7,5,-1,-1,-1,-1,-1,-1,-1,8,2,0,8,5,2,8,7,5,10,2,5,-1,-1,-1,-1,9,0,1,5,10,3,5,3,7,3,10,2,-1,-1,-1,-1,9,8,2,9,2,1,8,7,2,10,2,5,7,5,2,-1,1,3,5,3,7,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,8,7,0,7,1,1,7,5,-1,-1,-1,-1,-1,-1,-1,9,0,3,9,3,5,5,3,7,-1,-1,-1,-1,-1,-1,-1,9,8,7,5,9,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,5,8,4,5,10,8,10,11,8,-1,-1,-1,-1,-1,-1,-1,5,0,4,5,11,0,5,10,11,11,3,0,-1,-1,-1,-1,0,1,9,8,4,10,8,10,11,10,4,5,-1,-1,-1,-1,10,11,4,10,4,5,11,3,4,9,4,1,3,1,4,-1,2,5,1,2,8,5,2,11,8,4,5,8,-1,-1,-1,-1,0,4,11,0,11,3,4,5,11,2,11,1,5,1,11,-1,0,2,5,0,5,9,2,11,5,4,5,8,11,8,5,-1,9,4,5,2,11,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,5,10,3,5,2,3,4,5,3,8,4,-1,-1,-1,-1,5,10,2,5,2,4,4,2,0,-1,-1,-1,-1,-1,-1,-1,3,10,2,3,5,10,3,8,5,4,5,8,0,1,9,-1,5,10,2,5,2,4,1,9,2,9,4,2,-1,-1,-1,-1,8,4,5,8,5,3,3,5,1,-1,-1,-1,-1,-1,-1,-1,0,4,5,1,0,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,8,4,5,8,5,3,9,0,5,0,3,5,-1,-1,-1,-1,9,4,5,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,11,7,4,9,11,9,10,11,-1,-1,-1,-1,-1,-1,-1,0,8,3,4,9,7,9,11,7,9,10,11,-1,-1,-1,-1,1,10,11,1,11,4,1,4,0,7,4,11,-1,-1,-1,-1,3,1,4,3,4,8,1,10,4,7,4,11,10,11,4,-1,4,11,7,9,11,4,9,2,11,9,1,2,-1,-1,-1,-1,9,7,4,9,11,7,9,1,11,2,11,1,0,8,3,-1,11,7,4,11,4,2,2,4,0,-1,-1,-1,-1,-1,-1,-1,11,7,4,11,4,2,8,3,4,3,2,4,-1,-1,-1,-1,2,9,10,2,7,9,2,3,7,7,4,9,-1,-1,-1,-1,9,10,7,9,7,4,10,2,7,8,7,0,2,0,7,-1,3,7,10,3,10,2,7,4,10,1,10,0,4,0,10,-1,1,10,2,8,7,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,9,1,4,1,7,7,1,3,-1,-1,-1,-1,-1,-1,-1,4,9,1,4,1,7,0,8,1,8,7,1,-1,-1,-1,-1,4,0,3,7,4,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,8,7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,9,10,8,10,11,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,0,9,3,9,11,11,9,10,-1,-1,-1,-1,-1,-1,-1,0,1,10,0,10,8,8,10,11,-1,-1,-1,-1,-1,-1,-1,3,1,10,11,3,10,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,2,11,1,11,9,9,11,8,-1,-1,-1,-1,-1,-1,-1,3,0,9,3,9,11,1,2,9,2,11,9,-1,-1,-1,-1,0,2,11,8,0,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,3,2,11,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,8,2,8,10,10,8,9,-1,-1,-1,-1,-1,-1,-1,9,10,2,0,9,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,2,3,8,2,8,10,0,1,8,1,10,8,-1,-1,-1,-1,1,10,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,3,8,9,1,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,9,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,3,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]);
 // ---- field + marching cubes + exporters ----
 const PI = Math.PI;
+// spherical Bessel j_L(x), from a table built once per L with downward recurrence
+const sphJTab = [];
+function sphJ(L, x) {
+  if (x >= 140) return Math.sin(x - L * PI / 2) / x;
+  let t = sphJTab[L];
+  if (!t) {
+    t = sphJTab[L] = new Float32Array(7002);
+    for (let i = 0; i < t.length; i++) {
+      const v = i * 0.02;
+      if (v < 1e-6) { t[i] = L === 0 ? 1 : 0; continue; }
+      let fp = 0, f = 1e-30, jl = 0, f1 = 0;
+      for (let n = Math.ceil(v) + L + 25; n >= 1; n--) {
+        if (n === L) jl = f;
+        if (n === 1) f1 = f;
+        const fm = (2 * n + 1) / v * f - fp; fp = f; f = fm;
+        if (Math.abs(f) > 1e200) { f *= 1e-200; fp *= 1e-200; jl *= 1e-200; f1 *= 1e-200; }
+      }
+      if (L === 0) jl = f;
+      const j0 = Math.sin(v) / v, j1 = Math.sin(v) / (v * v) - Math.cos(v) / v;
+      t[i] = jl * (Math.abs(j0) >= Math.abs(j1) ? j0 / f : j1 / f1);
+    }
+  }
+  const u = x * 50, i = u | 0, w = u - i;
+  return t[i] * (1 - w) + t[i + 1] * w;
+}
+// associated Legendre P_L^M(c), scaled to stay within -1..1
+const legNorm = [];
+function legendre(L, M, c) {
+  let pmm = 1;
+  if (M > 0) { const s = Math.sqrt(Math.max(0, 1 - c * c)); let fct = 1; for (let i = 1; i <= M; i++) { pmm *= -fct * s; fct += 2; } }
+  let v = pmm;
+  if (L > M) {
+    let p1 = c * (2 * M + 1) * pmm; v = p1;
+    for (let l = M + 2; l <= L; l++) { v = ((2 * l - 1) * c * p1 - (l + M - 1) * pmm) / (l - M); pmm = p1; p1 = v; }
+  }
+  const key = L * 9 + M; let nrm = legNorm[key];
+  if (nrm === undefined) { nrm = 1; for (let i = L - M + 1; i <= L + M; i++) nrm /= i; nrm = legNorm[key] = Math.sqrt(nrm); }
+  return v * nrm;
+}
 function makeField(p) {
   const { type, l, m, n, l2, m2, n2, mix } = p;
   const ch = (x, y, z, a, b, c) =>
@@ -186,7 +228,23 @@ function makeField(p) {
     const X = a*2*PI*x, Y = b*2*PI*y, Z = c*2*PI*z;
     return (Math.sin(X)*Math.cos(Y) + Math.sin(Y)*Math.cos(Z) + Math.sin(Z)*Math.cos(X)) * 2;
   };
-  const f = type === 'gyroid' ? gy : ch;
+  const schP = (x, y, z, a, b, c) => Math.cos(a*2*PI*x) + Math.cos(b*2*PI*y) + Math.cos(c*2*PI*z);
+  const dia = (x, y, z, a, b, c) => {
+    const X = a*2*PI*x, Y = b*2*PI*y, Z = c*2*PI*z, sx = Math.sin(X), sy = Math.sin(Y), sz = Math.sin(Z), cx = Math.cos(X), cy = Math.cos(Y), cz = Math.cos(Z);
+    return (sx*sy*sz + sx*cy*cz + cx*sy*cz + cx*cy*sz) * 2;
+  };
+  const neo = (x, y, z, a, b, c) => {
+    const cx = Math.cos(a*2*PI*x), cy = Math.cos(b*2*PI*y), cz = Math.cos(c*2*PI*z);
+    return (3 * (cx + cy + cz) + 4 * cx * cy * cz) / 4;
+  };
+  // standing wave of a resonant sphere: spherical Bessel (radial) times a spherical harmonic (angular)
+  const sph = (x, y, z, a, b, c) => {
+    const L = Math.min(8, Math.max(0, Math.round(b))), M = Math.min(L, Math.max(0, Math.round(c)));
+    const dx = x - 0.5, dy = y - 0.5, dz = z - 0.5, r = Math.hypot(dx, dy, dz), X = 2 * PI * a * r;
+    const ct = r > 1e-9 ? dz / r : 1;
+    return 3 * (1 + X) * sphJ(L, X) * legendre(L, M, ct) * (M ? Math.cos(M * Math.atan2(dy, dx)) : 1);
+  };
+  const f = { gyroid: gy, schwarzp: schP, diamond: dia, neovius: neo, sphere: sph }[type] || ch;
   const g = mix <= 0 ? (x, y, z) => f(x, y, z, l, m, n)
     : (x, y, z) => (1 - mix) * f(x, y, z, l, m, n) + mix * f(x, y, z, l2, m2, n2);
   const ox = p.ox || 0, oy = p.oy || 0, oz = p.oz || 0;
@@ -208,12 +266,17 @@ function buildMesh(p, fieldOverride) {
     // (the shell is rewritten as t² - f², which has no ridge, so its ends close round instead of as a knife edge)
     const band = Math.max(0.05, p.fallAmt) * 0.5, amp = (shell ? t * t : t + 3) + 0.05, kind = p.fallShape, R = 0.18;
     if (shell) for (let q = 0; q < val.length; q++) { const w = t - val[q]; val[q] = t > 0 ? t * t - w * w : -1; }
-    for (let k = 0, q = 0; k < S; k++) { const cz = Math.abs(k / N - 0.5);
+    for (let k = 0, q = 0; k < S; k++) { const zs = k / N - 0.5, cz = Math.abs(zs);
       for (let j = 0; j < S; j++) { const cy = Math.abs(j / N - 0.5);
         for (let i = 0; i < S; i++, q++) { const cx = Math.abs(i / N - 0.5);
           let d;                                   // signed distance to the outer shape, negative inside
           if (kind === 'sphere') d = Math.hypot(cx, cy, cz) - 0.5;
           else if (kind === 'cylinder') { const a = Math.hypot(cx, cy) - 0.5, b = cz - 0.5; d = Math.min(Math.max(a, b), 0) + Math.hypot(Math.max(a, 0), Math.max(b, 0)); }
+          else if (kind === 'cone') {              // base radius 0.5 at the bottom, apex at the top
+            const r = Math.hypot(cx, cy), ax = r - Math.min(r, zs < 0 ? 0.5 : 0), ay = cz - 0.5;
+            const tt = Math.min(Math.max((r * 0.5 + (0.5 - zs)) / 1.25, 0), 1), bx = r - 0.5 * tt, by = zs - 0.5 + tt;
+            d = (bx < 0 && ay < 0 ? -1 : 1) * Math.sqrt(Math.min(ax * ax + ay * ay, bx * bx + by * by));
+          }
           else { const a = cx - 0.5 + R, b = cy - 0.5 + R, c = cz - 0.5 + R; d = Math.hypot(Math.max(a, 0), Math.max(b, 0), Math.max(c, 0)) + Math.min(Math.max(a, b, c), 0) - R; }
           const s = 1 + d / band;
           if (s > 0) val[q] -= amp * s * s;
@@ -561,7 +624,7 @@ function syncLabels() {
   const a = ['l','m','n'].map((k) => fmt($(k).value)).join('·');
   const b = ['l2','m2','n2'].map((k) => fmt($(k).value)).join('·');
   const mir = ['mx','my','mz'].filter((k) => $(k).checked).map((k) => k[1].toUpperCase()).join('');
-  $('hMode').textContent = ($('type').value === 'gyroid' ? 'gyroid ' : '') + a + (off ? '' : ' + ' + b) + (mir ? ' mirror ' + mir : '');
+  $('hMode').textContent = ({ gyroid: 'gyroid ', schwarzp: 'schwarz p ', diamond: 'diamond ', neovius: 'neovius ', sphere: 'sphere ' }[$('type').value] || '') + a + (off ? '' : ' + ' + b) + (mir ? ' mirror ' + mir : '');
   mat.uniforms.uLayers.value = +$('size').value / 18;
   mat.uniforms.uShow.value = $('layers').checked ? 1 : 0;
   const fg = $('fg').value, bg = $('bg').value;
@@ -594,6 +657,10 @@ const presets = [
   ['gyroid', { type:'gyroid', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.55, shape:'shell' }],
   ['mirrored gyroid', { type:'gyroid', l:1.5, m:1.5, n:1, mix:0, thickness:0.6, shape:'shell', mx:true, my:true }],
   ['soft block', { type:'gyroid', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.7, shape:'shell', mx:true, my:true, fall:true, fallShape:'rbox', fallAmt:0.45 }],
+  ['schwarz p', { type:'schwarzp', l:2, m:2, n:2, mix:0, thickness:0.5, shape:'shell' }],
+  ['diamond', { type:'diamond', l:1.5, m:1.5, n:1.5, mix:0, thickness:0.5, shape:'shell' }],
+  ['neovius', { type:'neovius', l:1, m:1, n:1, mix:0, thickness:0.45, shape:'shell' }],
+  ['sphere mode', { type:'sphere', l:3.5, m:4, n:2, mix:0, thickness:0.35, shape:'shell', fall:true, fallShape:'sphere', fallAmt:0.25 }],
   ['bubbles', { type:'chladni', l:3, m:3, n:1, mix:0, thickness:-0.2, shape:'solid' }],
 ];
 function apply(v) {
@@ -616,10 +683,10 @@ $('panel').addEventListener('submit', (e) => e.preventDefault());
 
 // ---------- help ----------
 const tips = {
-  type: ['Field', 'The wave that fills the cube. Chladni adds three cosine standing waves, like the resonant modes of air in a cubic room. Gyroid is a twisting, channel-like surface with no mirror planes of its own.'],
-  l: ['l', 'First wave number. Higher values pack more nodes into the cube, so you get more walls and holes, each one thinner. In Chladni it counts half-waves across the cube and is cycled through all three axes with m and n. In Gyroid it sets the number of periods along X.'],
-  m: ['m', 'Second wave number. Works like l. In Gyroid it sets the number of periods along Y. Making l, m and n different from each other gives less regular shapes.'],
-  n: ['n', 'Third wave number. Works like l. In Gyroid it sets the number of periods along Z. At 0 the wave stops varying in that direction. Values between whole numbers (1.3, 2.5) break the symmetry.'],
+  type: ['Field', 'The wave that fills the cube. Chladni adds three cosine standing waves, like the resonant modes of air in a cubic room. Sphere modes are the standing waves of a resonant sphere: concentric shells cut into lobes. Gyroid, Schwarz P, Schwarz D and Neovius are repeating minimal surfaces: twisting channels, tubes on a grid, tetrahedral channels and a lace of openings.'],
+  l: ['l', 'First wave number. Higher values pack more nodes into the cube, so you get more walls and holes, each one thinner. Chladni: half-waves across the cube, cycled through all three axes with m and n. Sphere modes: number of waves from the centre outward, so more concentric shells. All other fields: periods along X.'],
+  m: ['m', 'Second wave number. Chladni: works like l. Sphere modes: number of nodal bands between the poles, rounded to a whole number up to 8. All other fields: periods along Y. Making l, m and n different from each other gives less regular shapes.'],
+  n: ['n', 'Third wave number. Chladni: works like l. Sphere modes: number of segments around the vertical axis, rounded to a whole number and never more than m. All other fields: periods along Z. Values between whole numbers (1.3, 2.5) break the symmetry.'],
   mirrorLab: ['Mirror', 'Reflects the shape across the middle plane of that axis, so one half becomes the mirror image of the other and a crease appears where they meet. Most visible with Gyroid, with fractional wave numbers or with an offset.'],
   ox: ['Offset X', 'Slides the cube along X through the wave, as a fraction of the cube edge. The wave stays put and the cube cuts a different piece of it, so you can travel along the shape. With Mirror on, the mirror plane stays in the middle.'],
   oy: ['Offset Y', 'Slides the cube along Y through the wave. Works like Offset X.'],

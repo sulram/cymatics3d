@@ -6,11 +6,11 @@ A 3D cymatics generator that runs in the browser. It builds the nodal surface of
 
 ## What it does
 
-- Two fields: Chladni modes of a resonant cube (wave numbers l, m, n) and a gyroid
+- Six fields: Chladni modes of a resonant cube, modes of a resonant sphere, gyroid, Schwarz P, Schwarz D (diamond) and Neovius
 - Mirror on X, Y, Z and an offset on each axis to travel through the wave
 - A second mode that can be mixed into the first
 - Shell or volume solids, with adjustable thickness
-- Falloff toward a sphere, cylinder or rounded cube, so the solid closes with rounded ends instead of flat cuts
+- Falloff toward a sphere, cylinder, cone or rounded cube, so the solid closes with rounded ends instead of flat cuts
 - Resolution up to 256 cells per edge, meshed with marching cubes in a Web Worker
 - Export to GLB (metres, Y up) and binary STL (millimetres, Z up), always as a closed mesh
 - Settings saved and loaded as a small JSON file, also by drag and drop
